@@ -29,6 +29,7 @@ class OnSiteEnv(gym.Env):
         self.self_color = None
         self.selected = (0, 0)
         self.map_history = queue.Queue()        # readonly
+        self.action_history = queue.Queue()     # readonly
         self.view = False
         self.observation = None
 
@@ -60,7 +61,7 @@ class OnSiteEnv(gym.Env):
             self.view = True
         return self.map
 
-    def step(self, action):
+    def step(self, action: torch.Tensor):
         """
         do a step
         :param action: movement => [x1, y1, x2, y2, is_half]
@@ -75,6 +76,21 @@ class OnSiteEnv(gym.Env):
             return self.observation, reward, True, {}
 
         self.update_map()
+        self.move(action)
+
+        # calc reward
+        last_move = self.action_history.queue[-1]
+        if self.map[1][last_move[2]][last_move[3]] == BlockType.city:
+            if self.map[2][last_move[2]][last_move[3]] != self.self_color:
+                # if bot run into a tower
+                reward = -10
+
+        # save action
+        if self.action_history.qsize() == 3:
+            self.action_history.get()
+        self.action_history.put(copy.copy(action))
+
+        return self.observation, reward, False, {}
 
     def render(self, mode="human"):
         """
