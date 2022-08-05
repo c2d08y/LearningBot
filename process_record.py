@@ -91,8 +91,7 @@ class FrameGenerator(object):
 
     def _convert(self):
         """
-        convert self_map to tensor
-        https://www.luogu.com.cn/paste/vfjtav4b
+        convert self_map to tensor\
         :return:
         """
         t_t = torch.zeros([4, self.size, self.size])
