@@ -1,5 +1,5 @@
 # LearningBot
-Reinforcement Learning Bot for https://kana.byha.top:444/
+A reinforcement Learning Bot for https://kana.byha.top:444/
 
 Work in progress.
 
