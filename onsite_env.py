@@ -64,7 +64,7 @@ class OnSiteEnv(gym.Env):
             # surrender if game mode is "pubg" or "shrimp grabbing"
             self.driver.find_element(By.ID, "view").click()
             self.view = True
-        return self.map
+        return self.observation
 
     def step(self, action: torch.Tensor):
         """
@@ -130,6 +130,7 @@ class OnSiteEnv(gym.Env):
         pass
 
     def init_map(self):
+        time.sleep(0.2)
         # get map size
         self._map_data = self.game_table.get_attribute("innerHTML")
         self._blocks = self.block_finder.findall(self._map_data)
@@ -219,6 +220,7 @@ class OnSiteEnv(gym.Env):
 
         # combine 3 frames as observation
         self.observation = torch.cat((self.map_history.queue[0], self.map_history.queue[1], self.map_history.queue[2]))
+        self.observation = self.observation.unsqueeze(0)
 
     def move(self, move_info):
         """
