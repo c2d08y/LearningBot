@@ -69,7 +69,7 @@ class OnSiteEnv(gym.Env):
     def step(self, action: torch.Tensor):
         """
         do a step
-        :param action: movement => [x1, y1, x2, y2, is_half]
+        :param action: movement => tensor([[x1, y1, x2, y2, is_half]])
         :return: observation (Tensor), reward (float), done (bool), info (dict)
         """
         reward = 0
@@ -84,7 +84,7 @@ class OnSiteEnv(gym.Env):
             return self.observation, reward, True, {}
 
         self.update_map()
-        self.move(action)
+        self.move([action[0][i] for i in range(5)])
 
         # calc reward
         _dirx = [0, -1, 0, 1, 1, -1, 1, -1]
@@ -111,7 +111,7 @@ class OnSiteEnv(gym.Env):
         # save action
         if self.action_history.qsize() == 3:
             self.action_history.get()
-        self.action_history.put(copy.copy(action))
+        self.action_history.put(copy.copy(action[0]))
 
         # check again
         state_now = self.win_check()
@@ -230,7 +230,7 @@ class OnSiteEnv(gym.Env):
         """
         if self.selected[0] != move_info[0] or self.selected[1] != move_info[1]:
             # if the block is not selected, then select it
-            self.driver.find_element_by_id(f"td-{(move_info[0] - 1) * self.map_size + move_info[1]}").click()
+            self.driver.find_element_by_id(f"td-{int((move_info[0] - 1) * self.map_size + move_info[1])}").click()
 
         # get the direction and press
         keys = ['w', 'a', 's', 'd']
