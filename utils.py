@@ -127,6 +127,7 @@ def login(driver):
     driver.find_element_by_name("pwd").send_keys(bot_pwd)
     while True:
         try:
+            time.sleep(3)
             driver.find_element_by_id("submitButton")
             driver.execute_script("alert('帮忙输一下验证码好不好qaq 等你10秒哦~~')")
             time.sleep(5)

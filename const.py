@@ -1,5 +1,4 @@
 import torch
-from numpy import tanh
 
 
 class BlockType(object):
@@ -22,19 +21,7 @@ class PlayerColor(object):
     maroon = 8
 
 
-class Weight(object):
-
-    @staticmethod
-    def road(rest):
-        return 20 * tanh(0.028 * (rest - 1))
-
-    @staticmethod
-    def city(rest):
-        return 30 * tanh(0.028 * (rest - 1))
-
-    @staticmethod
-    def crown():
-        return 1000
+explore_reward = {BlockType.road: 0.01, BlockType.mountain: 0.01, BlockType.crown: 10, BlockType.city: 0.01}
 
 
 class FrontColor(object):

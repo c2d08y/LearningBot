@@ -90,19 +90,19 @@ def main():
         print("train on device: cpu")
 
     pai20 = get_model("./model/non_maze.pth", 20).to(device)
-    # pai10 = get_model("./model/non_maze1v1.pth", 10).to(device)
-    # pai19 = get_model("./model/maze.pth", 19).to(device)
-    # pai9 = get_model("./model/maze1v1.pth", 9).to(device)
+    pai10 = get_model("./model/non_maze1v1.pth", 10).to(device)
+    pai19 = get_model("./model/maze.pth", 19).to(device)
+    pai9 = get_model("./model/maze1v1.pth", 9).to(device)
 
     train(pai20, FrameDataset("./Datasets/non_maze/"), 20, device)
-    # train(pai10, FrameDataset("./Datasets/non_maze1v1/"), 10, device)
-    # train(pai19, FrameDataset("./Datasets/maze/"), 19, device)
-    # train(pai9, FrameDataset("./Datasets/maze1v1/"), 9, device)
+    train(pai10, FrameDataset("./Datasets/non_maze1v1/"), 10, device)
+    train(pai19, FrameDataset("./Datasets/maze/"), 19, device)
+    train(pai9, FrameDataset("./Datasets/maze1v1/"), 9, device)
 
     torch.save(pai20, "./model/non_maze.pth")
-    # torch.save(pai10, "./model/non_maze1v1.pth")
-    # torch.save(pai19, "./model/maze.pth")
-    # torch.save(pai9, "./model/maze1v1.pth")
+    torch.save(pai10, "./model/non_maze1v1.pth")
+    torch.save(pai19, "./model/maze.pth")
+    torch.save(pai9, "./model/maze1v1.pth")
 
 
 if __name__ == '__main__':
