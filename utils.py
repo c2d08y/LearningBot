@@ -1,22 +1,25 @@
 import math
+import os
 import time
+import torch
 from selenium import webdriver
 from selenium.common.exceptions import NoAlertPresentException, TimeoutException, NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
+from networks import *
 from settings import *
 
 
 class next_round(object):
 
-    def __init__(self, locator, old):
-        self.locator = locator
+    def __init__(self, old):
         self.old = old
+        self.new = None
 
     def __call__(self, driver):
         try:
-            new = driver.find_element(self.locator[0], self.locator[1])
+            new = driver.find_element(By.CSS_SELECTOR, ".own.crown").text
         except Exception:
             return False
         return new != self.old
@@ -161,3 +164,10 @@ def init_driver_options() -> webdriver.ChromeOptions:
     options.add_experimental_option("prefs", prefs)
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     return options
+
+
+def get_model(model_name: str, model_path, map_size):
+    if os.path.exists(model_path):
+        return torch.load(model_path)
+    else:
+        return Actor(map_size) if model_name.lower() == "actor" else Critic(map_size)

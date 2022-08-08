@@ -1,13 +1,9 @@
-import os
-import time
-
 import torch.optim
-from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from networks import Actor
 from dataset import FrameDataset
 from const import *
+from utils import *
 
 
 def train(pai: Actor, dataset: FrameDataset, map_size, device, bs=1):
@@ -32,12 +28,12 @@ def train(pai: Actor, dataset: FrameDataset, map_size, device, bs=1):
 
     # optimizer
     learning_rate = 0.01
-    optimizer = torch.optim.SGD(params=pai.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(params=pai.parameters(), lr=learning_rate)
 
     # others
-    epoch = 1                                  # train times
-    trained_steps = 0                             # count steps already trained
-    writer = SummaryWriter("pre_train_logs")    # graph drawer
+    epoch = 1                                       # train times
+    trained_steps = 0                               # count steps already trained
+    writer = SummaryWriter("pre_train_logs")        # graph drawer
 
     # train
     for i in range(epoch):
@@ -73,13 +69,6 @@ def train(pai: Actor, dataset: FrameDataset, map_size, device, bs=1):
     writer.close()
 
 
-def get_model(model_path, map_size):
-    if os.path.exists(model_path):
-        return torch.load(model_path)
-    else:
-        return Actor(map_size)
-
-
 def main():
     # check_gpu
     if torch.cuda.is_available():
@@ -89,14 +78,18 @@ def main():
         device = torch.device("cpu")
         print("train on device: cpu")
 
-    pai20 = get_model("./model/non_maze.pth", 20).to(device)
-    pai10 = get_model("./model/non_maze1v1.pth", 10).to(device)
-    pai19 = get_model("./model/maze.pth", 19).to(device)
-    pai9 = get_model("./model/maze1v1.pth", 9).to(device)
+    pai20 = get_model("actor", "./model/non_maze.pth", 20).to(device)
+    pai10 = get_model("actor", "./model/non_maze1v1.pth", 10).to(device)
+    pai19 = get_model("actor", "./model/maze.pth", 19).to(device)
+    pai9 = get_model("actor", "./model/maze1v1.pth", 9).to(device)
 
+    print("training non_maze")
     train(pai20, FrameDataset("./Datasets/non_maze/"), 20, device)
+    print("training non_maze1v1")
     train(pai10, FrameDataset("./Datasets/non_maze1v1/"), 10, device)
+    print("training maze")
     train(pai19, FrameDataset("./Datasets/maze/"), 19, device)
+    print("training maze1v1")
     train(pai9, FrameDataset("./Datasets/maze1v1/"), 9, device)
 
     torch.save(pai20, "./model/non_maze.pth")
@@ -106,4 +99,9 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception:
+        pass
+
+    os.system("shutdown -s")

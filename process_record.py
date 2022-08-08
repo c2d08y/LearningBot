@@ -1,4 +1,3 @@
-import os
 import pickle
 import zlib
 import json
@@ -114,11 +113,9 @@ class FrameGenerator(object):
         """
         cm = 0
         if color == PlayerColor.grey:
-            cm = 0.5
-        elif color > self.perspective:
-            cm = color + 30
-        elif color < self.perspective:
-            cm = color - 30
+            cm = -40
+        elif color != self.perspective:
+            cm = 40 + 5 * color
         return cm
 
     def _write(self, h_0, h_1, h_2, action):

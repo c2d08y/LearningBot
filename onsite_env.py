@@ -28,7 +28,7 @@ class OnSiteEnv(gym.Env):
         self.map_size = None
         self.self_color = None
         self.selected = (0, 0)
-        self.map_history = queue.Queue()        # readonly
+        self.map_history = queue.Queue()        # readonly long
         self.action_history = queue.Queue()     # readonly
         self.view = False
         self.observation = None
@@ -58,7 +58,7 @@ class OnSiteEnv(gym.Env):
         # init map
         c1, c2 = self.init_map()
         # push action
-        self.action_history.put(torch.as_tensor([0, 0, 0, 0, 0]))
+        self.action_history.put(torch.as_tensor([0, 0, 0, 0, 0], dtype=torch.long))
 
         if c1 != 1 or c2 >= 100:
             # surrender if game mode is "pubg" or "shrimp grabbing"
@@ -75,7 +75,7 @@ class OnSiteEnv(gym.Env):
         reward = 0
 
         # wait for next round
-        wait_until(next_round((By.CSS_SELECTOR, ".own.crown"), self.crown_ele.text), self.driver)
+        wait_until(next_round(self.crown_ele.text), self.driver)
 
         # check game state
         state_now = self.win_check()
@@ -84,7 +84,14 @@ class OnSiteEnv(gym.Env):
             return self.observation, reward, True, {}
 
         self.update_map()
-        self.move([action[0][i] for i in range(5)])
+        try:
+            # game ends when moving
+            self.move(action)
+        except Exception:
+            state_now = self.win_check()
+            if state_now != 0:
+                reward = 100 if state_now == 2 else -100
+                return self.observation, reward, True, {}
 
         # calc reward
         _dirx = [0, -1, 0, 1, 1, -1, 1, -1]
@@ -92,16 +99,18 @@ class OnSiteEnv(gym.Env):
         last_move = self.action_history.queue[-1]
         last_map = self.map_history.queue[-1]
         # if bot do an invalid move
-        if last_map[2][last_move[0]][last_move[1]] != self._get_colormark(self.self_color):
+        if last_map[2][last_move[0] - 1][last_move[1] - 1] != self._get_colormark(self.self_color):
             reward -= 100
         # if bot run into a tower
-        if self.map[1][last_move[2]][last_move[3]] == BlockType.city:
-            if self.map[2][last_move[2]][last_move[3]] != self._get_colormark(self.self_color):
+        if self.map[1][last_move[2] - 1][last_move[3] - 1] == BlockType.city:
+            if self.map[2][last_move[2] - 1][last_move[3] - 1] != self._get_colormark(self.self_color):
                 reward -= 10
         # if bot explored a block
         for i in range(8):
-            t_x = last_move[2] + _dirx[i]
-            t_y = last_move[3] + _diry[i]
+            t_x = last_move[2] - 1 + _dirx[i]
+            t_y = last_move[3] - 1 + _diry[i]
+            if t_x < 0 or t_x >= self.map_size or t_y < 0 or t_y >= self.map_size:
+                continue
             if self.map[3][t_x][t_y] - last_map[3][t_x][t_y] == 1:
                 reward += explore_reward[self.map[1][t_x][t_y]]
                 # if the block belongs to a player, offer 0.5 reward in addition
@@ -111,7 +120,7 @@ class OnSiteEnv(gym.Env):
         # save action
         if self.action_history.qsize() == 3:
             self.action_history.get()
-        self.action_history.put(copy.copy(action[0]))
+        self.action_history.put(copy.copy(action[0].long()))
 
         # check again
         state_now = self.win_check()
@@ -136,7 +145,7 @@ class OnSiteEnv(gym.Env):
         self._blocks = self.block_finder.findall(self._map_data)
         self.map_size = int(math.sqrt(len(self._blocks)))
         # search for crown
-        crown_s = self.driver.find_elements(By.CSS_SELECTOR, ".crown")
+        crown_s = self.driver.find_elements(By.CSS_SELECTOR, ".own.crown")
         self.crown_ele = crown_s[0]
         self.self_color = self._get_color(self.crown_ele.get_attribute("class"))
         cnt1 = len(crown_s)
@@ -185,7 +194,7 @@ class OnSiteEnv(gym.Env):
                     self.map[3][i][j] = shown
                     continue
                 # get value and type
-                if b_attr == "unshown":
+                if "unshown" == b_attr:
                     self.map[0][i][j] = b_value
                     self.map[1][i][j] = BlockType.road
                     b_attr += " grey"
@@ -212,6 +221,12 @@ class OnSiteEnv(gym.Env):
                     b_attr += " grey"
                 # get colormark
                 color = self._get_color(b_attr)
+                if color is None:
+                    print(b_attr)
+                    print(i)
+                    print(j)
+                    print(self._blocks)
+                    exit(1)
                 self.map[2][i][j] = self._get_colormark(color)
                 # set shown
                 self.map[3][i][j] = shown
@@ -222,13 +237,14 @@ class OnSiteEnv(gym.Env):
         self.observation = torch.cat((self.map_history.queue[0], self.map_history.queue[1], self.map_history.queue[2]))
         self.observation = self.observation.unsqueeze(0)
 
-    def move(self, move_info):
+    def move(self, mov):
         """
         just as the name
-        :param move_info: [x1, y1, x2, y2, is_half]
+        :param mov: tensor([[x1, y1, x2, y2, is_half]])
         :return:
         """
-        if self.selected[0] != move_info[0] or self.selected[1] != move_info[1]:
+        move_info = mov[0].long()
+        if self.selected[0] != move_info[0] - 1 or self.selected[1] != move_info[1] - 1:
             # if the block is not selected, then select it
             self.driver.find_element_by_id(f"td-{int((move_info[0] - 1) * self.map_size + move_info[1])}").click()
 
@@ -240,9 +256,9 @@ class OnSiteEnv(gym.Env):
             if difx == dx[i] and dify == dy[i]:
                 ActionChains(self.driver).send_keys(keys[i]).perform()
 
-        if self.map[1][move_info[2]][move_info[3]] != BlockType.mountain and \
-                self.map[1][move_info[2]][move_info[3]] != BlockType.obstacle:
-            self.selected = (move_info[2], move_info[3])
+        if self.map[1][move_info[2] - 1][move_info[3] - 1] != BlockType.mountain and \
+                self.map[1][move_info[2] - 1][move_info[3] - 1] != BlockType.obstacle:
+            self.selected = (move_info[2] - 1, move_info[3] - 1)
 
     def win_check(self) -> int:
         """
@@ -286,13 +302,15 @@ class OnSiteEnv(gym.Env):
             return PlayerColor.chocolate
         if "maroon" in class_name:
             return PlayerColor.maroon
+        return PlayerColor.grey
 
     def _get_colormark(self, color):
         cm = 0
         if color == PlayerColor.grey:
-            cm = 0.5
-        elif color > self.self_color:
-            cm = color + 30
-        elif color < self.self_color:
-            cm = color - 30
+            cm = -40
+        elif color != self.self_color:
+            cm = 40 + 5 * color
         return cm
+
+    def quit_signal(self):
+        return False
