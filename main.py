@@ -13,16 +13,17 @@ def main(train=True):
 
     device = torch.device("cuda")
     args = {
-        "batch_size": None,
+        "batch_size": 100,
         "state_dim": None,
         "action_dim": 5,
-        "lr_a": None,
-        "lr_c": None,
+        "lr_a": 0.01,
+        "lr_c": 0.01,
         "gamma": None,
         "lambda": None,
         "epsilon": None,
         "k_epochs": None,
         "entropy_coef": None,
+        "autosave_step": 107,
         "device": device
     }
 
@@ -63,6 +64,9 @@ def main(train=True):
             if len(replay_buffer) == args["batch_size"]:
                 agent.learn(replay_buffer, total_steps)
                 replay_buffer.clear()
+
+            if total_steps % args["autosave_step"] == 0:
+                agent.save()
 
         if env.quit_signal():
             break

@@ -1,4 +1,3 @@
-from torch import  functional as F
 from torch.distributions import Categorical
 from torch.utils.data import BatchSampler, SubsetRandomSampler
 from utils import *
@@ -17,6 +16,7 @@ class PPOAgent(object):
         self.entropy_coef = args["entropy_coef"]
         self.device = args["device"]  # device
 
+        # networks
         self.pai_set = {
             20: get_model("actor", "./model/non_maze.pth", 20),
             19: get_model("actor", "./model/maze.pth", 19),
@@ -31,9 +31,11 @@ class PPOAgent(object):
         }
         self.pai = self.pai_set[0]
         self.v = self.v_set[0]
-        self.softmax = nn.Softmax(dim=0)
         self.optimizer_actor = torch.optim.Adam(self.pai.parameters(), lr=self.lr_a, eps=1e-5)
         self.optimizer_critic = torch.optim.Adam(self.v.parameters(), lr=self.lr_c, eps=1e-5)
+
+        # others
+        self.mse_loss_fn = nn.MSELoss()
 
     def learn(self, rep, step_t):
         """
@@ -63,32 +65,29 @@ class PPOAgent(object):
         # Optimize policy for K epochs:
         for _ in range(self.k_epochs):
             for index in BatchSampler(SubsetRandomSampler(range(self.batch_size)), self.batch_size, False):
-                dist_now = Categorical(self.softmax(self.pai(s[index])))
-                dist_entropy = dist_now.entropy().view(-1, 1)  # shape(mini_batch_size X 1)
-                a_logprob_now = dist_now.log_prob(a[index].squeeze()).view(-1, 1)  # shape(mini_batch_size X 1)
-                # a/b=exp(log(a)-log(b))
-                ratios = torch.exp(a_logprob_now - a_log_prob[index])  # shape(mini_batch_size X 1)
+                dist_now = Categorical(self.pai(s[index]))
+                dist_entropy = dist_now.entropy().view(-1, 1)                       # shape(batch_size X 1)
+                a_log_prob_now = dist_now.log_prob(a[index].squeeze()).view(-1, 1)  # shape(batch_size X 1)
 
-                surr1 = ratios * adv[index]  # Only calculate the gradient of 'a_logprob_now' in ratios
+                # https://www.luogu.com.cn/paste/9vwi6ls0
+                ratios = torch.exp(a_log_prob_now - a_log_prob[index])              # shape(batch_size X 1)
+                surr1 = ratios * adv[index]
                 surr2 = torch.clamp(ratios, 1 - self.epsilon, 1 + self.epsilon) * adv[index]
                 actor_loss = -torch.min(surr1,
-                                        surr2) - self.entropy_coef * dist_entropy  # shape(mini_batch_size X 1)
+                                        surr2) - self.entropy_coef * dist_entropy  # shape(batch_size X 1)
                 # Update actor
                 self.optimizer_actor.zero_grad()
                 actor_loss.mean().backward()
-
-                # Trick 7: Gradient clip
+                # Gradient clip
                 torch.nn.utils.clip_grad_norm_(self.pai.parameters(), 0.5)
                 self.optimizer_actor.step()
 
-                v_s = self.v(self.softmax(s[index]))
-                critic_loss = F.mse_loss(v_target[index], v_s)
-
+                v_s = self.v(s[index])
+                critic_loss = self.mse_loss_fn(v_target[index], v_s)
                 # Update critic
                 self.optimizer_critic.zero_grad()
                 critic_loss.backward()
-
-                # Trick 7: Gradient clip
+                # Gradient clip
                 torch.nn.utils.clip_grad_norm_(self.v.parameters(), 0.5)
                 self.optimizer_critic.step()
 
@@ -136,11 +135,18 @@ class PPOAgent(object):
         :return:
         """
         t = torch.zeros([1, 12, 20, 20]).to(self.device)
-        self.softmax(self.pai(t))
+        self.pai(t)
         self.v(t)
 
-    def load(self, path):
-        pass
+    def save(self):
+        # save policy networks
+        torch.save(self.pai_set[20], "./model/non_maze.pth")
+        torch.save(self.pai_set[10], "./model/non_maze1v1.pth")
+        torch.save(self.pai_set[19], "./model/maze.pth")
+        torch.save(self.pai_set[9], "./model/maze1v1.pth")
 
-    def save(self, path):
-        pass
+        # save value networks
+        torch.save(self.v_set[20], "./model/non_maze_critic.pth")
+        torch.save(self.v_set[10], "./model/non_maze1v1_critic.pth")
+        torch.save(self.v_set[19], "./model/maze_critic.pth")
+        torch.save(self.v_set[9], "./model/maze1v1_critic.pth")

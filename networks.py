@@ -20,11 +20,12 @@ class Actor(nn.Module):
         self.conv4 = nn.Conv2d(in_channels=48, out_channels=48, kernel_size=(3, 3), padding=1)
         self.batch_norm4 = nn.BatchNorm2d(48)
 
-        # dense
+        # dense & softmax
         self.dense_in = 48 * size ** 2
         self.dense_out = 4 * ((size - 2) ** 2 + 3 * (size - 2) + 2) * 2
         self.dense1 = nn.Linear(in_features=self.dense_in, out_features=self.dense_out)
         self.dense2 = nn.Linear(in_features=self.dense_out, out_features=self.dense_out)
+        self.softmax = nn.Softmax(dim=0)
 
         # activation function
         self.activ_func = nn.Tanh()
@@ -60,6 +61,7 @@ class Actor(nn.Module):
         x = self.activ_func(x)
 
         x = self.dense2(x)
+        x = self.softmax(x)
         return x
 
 

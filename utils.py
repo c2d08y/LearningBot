@@ -119,6 +119,18 @@ def print_map(game_map):
         print()
 
 
+def print_tensor_map(game_map):
+    color_trans = [37, 34, 31, 32, 33, 36, 35, 30]
+    type_trans = {0: 0, 3: 4, 4: 3, 2: 7}
+    size = game_map.shape[1]
+    for i in range(size):
+        for j in range(size):
+            print_with_color(style=type_trans[int(game_map[1][i][j])],
+                             front=color_trans[int(game_map[2][i][j])],
+                             background=48, content=str(int(game_map[0][i][j])), end='\t')
+        print()
+
+
 def login(driver):
     """
     just as the name

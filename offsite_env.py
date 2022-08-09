@@ -21,3 +21,5 @@ class OffSiteEnv(gym.Env):
     def update_map(self):
         pass
 
+    def gen_map(self, mode):
+        pass
