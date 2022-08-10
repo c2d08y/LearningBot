@@ -1,12 +1,12 @@
 import math
 import os
 import time
-import torch
 from selenium import webdriver
 from selenium.common.exceptions import NoAlertPresentException, TimeoutException, NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
+from const import *
 from networks import *
 from settings import *
 
@@ -113,21 +113,32 @@ def print_map(game_map):
     size = game_map[0][0]["size"]
     for i in range(1, size + 1):
         for j in range(1, size + 1):
+            bg = 47 if game_map[i][j]["type"] == 3 or game_map[i][j]["type"] == 5 else 48
             print_with_color(style=type_trans[game_map[i][j]["type"]],
                              front=color_trans[game_map[i][j]["color"]],
-                             background=48, content=game_map[i][j]["amount"], end='\t')
+                             background=bg, content=game_map[i][j]["amount"], end='\t')
         print()
 
 
 def print_tensor_map(game_map):
-    color_trans = [37, 34, 31, 32, 33, 36, 35, 30]
-    type_trans = {0: 0, 3: 4, 4: 3, 2: 7}
+    color_trans = [0, 44, 41, 42, 43, 46, 45, 105, 103]
+    type_trans = {
+        BlockType.road: Style.default,
+        BlockType.crown: Style.under_line,
+        BlockType.city: Style.italic,
+        BlockType.mountain: Style.default
+    }
     size = game_map.shape[1]
     for i in range(size):
         for j in range(size):
+            if game_map[1][i][j] == BlockType.city or game_map[1][i][j] == BlockType.mountain:
+                bg = 40
+            else:
+                bg = color_trans[int(game_map[2][i][j])]
+            ctt = '#' if game_map[1][i][j] == BlockType.mountain else str(int(game_map[0][i][j]))
             print_with_color(style=type_trans[int(game_map[1][i][j])],
-                             front=color_trans[int(game_map[2][i][j])],
-                             background=48, content=str(int(game_map[0][i][j])), end='\t')
+                             front=97,
+                             background=bg, content=ctt, end='\t')
         print()
 
 

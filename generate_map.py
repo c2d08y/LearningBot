@@ -1,5 +1,7 @@
 # python version of https://github.com/By-Ha/Checkmate/blob/master/game/map.js
 import random
+import functools
+import settings
 from const import *
 
 
@@ -114,3 +116,135 @@ def generate_random_map(player):
         last.append([t1, t2])
     gm[0][0]["type"] = 1
     return gm
+
+
+def generate_maze_map(player):
+    def rnd(num):
+        t = round(random.random() * num)
+        return num if t == 0 else t
+
+    gm = []
+    size = 0
+    id = {}
+    etot = 0
+    edges = []
+    vtot = 0
+    venum = []
+    if player == 2:
+        size = 9
+    else:
+        size = 19
+    for i in range(size + 1):
+        gm.append([])
+        venum.append([])
+        for j in range(size + 1):
+            gm[i].append({"color": 0, "type": 0, "amount": 0})
+            venum[i].append([])
+    gm[0][0] = {size: size}
+    for i in range(1, size + 1):
+        for j in range(1, size + 1):
+            if i % 2 == 0 and j % 2 == 0:
+                gm[i][j]["type"] = 4
+            if i % 2 == 1 and j % 2 == 1:
+                venum[i][j] = vtot
+                vtot += 1
+    for i in range(1, size + 1):
+        for j in range(1, size + 1):
+            tmp1 = i - 1
+            tmp3 = j - 1
+            tmp4 = j + 1
+            tmp2 = i + 1
+
+            if i % 2 == 0 and j % 2 == 1:
+                venum[i][j] = etot
+                edges.append({"a": venum[tmp1][j], "b": venum[tmp2][j], "w": 10 + int(rnd(10)), "posa": i, "posb": j})
+                etot += 1
+            if i % 2 == 1 and j % 2 == 0:
+                venum[i][j] = etot
+                edges.append({"a": venum[i][tmp3], "b": venum[i][tmp4], "w": 10 + int(rnd(10)), "posa": i, "posb": j})
+                etot += 1
+
+    def cmp(x, y):
+        return x["w"] - y["w"]
+
+    def find(x):
+        if x == id[x]:
+            return x
+        id[x] = find(id[x])
+        return id[x]
+
+    edges.sort(key=functools.cmp_to_key(cmp))
+    for i in range(vtot):
+        id[i] = i
+    for i in range(etot):
+        if find(edges[i]["a"]) != find(edges[i]["b"]):
+            id[find(edges[i]["a"])] = id[(edges[i]["b"])]
+            gm[edges[i]["posa"]][edges[i]["posb"]]["type"] = 5
+            gm[edges[i]["posa"]][edges[i]["posb"]]["amount"] = 10
+        else:
+            gm[edges[i]["posa"]][edges[i]["posb"]]["type"] = 4
+    calcTimes = 0
+    for i in range(1, player + 1):
+        calcTimes += 1
+        if calcTimes >= 100:
+            return generate_maze_map(player)
+        t1 = rnd(size)
+        t2 = rnd(size)
+        while True:
+            t1 = rnd(size)
+            t2 = rnd(size)
+            tmpcnt = 0
+            if t1 - 1 >= 1:
+                if gm[t1 - 1][t2]["type"] != 4:
+                    tmpcnt += 1
+            if t2 - 1 >= 1:
+                if gm[t1][t2 - 1]["type"] != 4:
+                    tmpcnt += 1
+            if t1 + 1 <= size:
+                if gm[t1 + 1][t2]["type"] != 4:
+                    tmpcnt += 1
+            if t2 + 1 <= size:
+                if gm[t1][t2 + 1]["type"] != 4:
+                    tmpcnt += 1
+            if gm[t1][t2]["type"] == 0 and tmpcnt == 1:
+                break
+        gm[t1][t2]["color"] = i
+        gm[t1][t2]["amount"] = 1
+        gm[t1][t2]["type"] = 1
+    i = 1
+    while i <= (size * size) / 15:
+        tryTime = 0
+        while True:
+            tryTime += 1
+            x = rnd(size)
+            y = rnd(size)
+            if tryTime >= 20:
+                break
+            flag = 0
+            flagUD = 0
+            flagLR = 0
+            for t1 in range(-1, 2):
+                for t2 in range(-1, 2):
+                    if t1 == 0 and t2 == 0:
+                        continue
+                    if 0 < x + t1 <= size and y + t2 <= size:
+                        if gm[x + t1][y + t2]["type"] == 1:
+                            flag = 1
+                            break
+                if flag:
+                    break
+            if flag or x % 2 == y % 2:
+                continue
+            if gm[x][y]["type"] == 4:
+                gm[x][y]["type"] = 5
+                gm[x][y]["amount"] = 10
+                break
+        i += 1
+    gm[0][0]["type"] = 1
+    return gm
+
+
+# if __name__ == '__main__':
+#     if settings.debug:
+#         from utils import *
+#         print_tensor_map(map_to_tensor(generate_random_map(2)))
