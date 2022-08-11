@@ -194,3 +194,16 @@ def get_model(model_name: str, model_path, map_size):
         return torch.load(model_path)
     else:
         return Actor(map_size) if model_name.lower() == "actor" else Critic(map_size)
+
+
+def map_to_tensor(game_map):
+    size = len(game_map) - 1
+    t = torch.zeros([4, size, size])
+    type_trans = [BlockType.road, BlockType.crown, BlockType.road, BlockType.city, BlockType.mountain, BlockType.city]
+    for i in range(1, size + 1):
+        for j in range(1, size + 1):
+            t[0][i - 1][j - 1] = game_map[i][j]["amount"]
+            t[1][i - 1][j - 1] = type_trans[int(game_map[i][j]["type"])]
+            t[2][i - 1][j - 1] = game_map[i][j]["color"]
+            t[3][i - 1][j - 1] = 1
+    return t
