@@ -2,6 +2,7 @@ import copy
 import queue
 import re
 import gym
+import torch.distributed.optim
 from selenium.webdriver import ActionChains
 from utils import *
 from const import *
@@ -13,71 +14,72 @@ class OnSiteEnv(gym.Env):
     def __init__(self):
         super(OnSiteEnv, self).__init__()
 
-        # consts & settings
+        # 常量
         self.base_url = "https://kana.byha.top:444"
         self.room = settings.default_room
         self.block_finder = re.compile(r'<td.*?id="td-\d+".*?class="(.*?)".*?>([\d\s]*)</td>')
 
-        # init driver
+        # 初始化浏览器
         self.driver = webdriver.Chrome(options=init_driver_options())
         login(self.driver)
 
-        # game args
+        # 游戏局内参数
         self.game_table = None
         self.map = None
         self.map_size = None
         self.self_color = None
         self.selected = (0, 0)
-        self.map_history = queue.Queue()        # readonly long
-        self.action_history = queue.Queue()     # readonly
+        self.map_history = queue.Queue()        # 只读 整型
+        self.action_history = queue.Queue()     # 只读
         self.view = False
         self.observation = None
         self.crown_ele = None
+        self.shown_before = None
 
-        # global temp variable
+        # 全局临时变量
         self._map_data = None
         self._blocks = None
 
     def reset(self):
         """
-        reset the environment (wait until game starts)
+        重设 顺便等待游戏开始
         :return: observation (Tensor)
         """
         if self.driver.current_url != self.base_url + "/checkmate/room/" + self.room:
-            # if bot is out of room
+            # 如果不在房间内
             self.enter_room(self.room)
         if self.view:
-            # if bot is in mode "view"
+            # 如果是旁观
             self.driver.find_element(By.ID, "view").click()
-        # get ready
+        # 准备
         ActionChains(self.driver).click(self.driver.find_element_by_id("ready")).perform()
-        # wait game to start
+        # 等
         WebDriverWait(self.driver, 86400).until_not(EC.text_to_be_present_in_element((By.ID, "game-status"), "准备中"))
-        # read table
+        # 获取table
         self.game_table = self.driver.find_element(By.ID, "m")
-        # init map
+        # 初始化地图
         c1, c2 = self.init_map()
-        # push action
+        # 保存action
         self.action_history.put(torch.as_tensor([0, 0, 0, 0, 0], dtype=torch.long))
 
         if c1 != 1 or c2 >= 100:
-            # surrender if game mode is "pubg" or "shrimp grabbing"
+            # 如果是流浪或者抓虾 那没事了
             self.driver.find_element(By.ID, "view").click()
             self.view = True
         return self.observation
 
     def step(self, action: torch.Tensor):
         """
-        do a step
+        执行一步
         :param action: movement => tensor([[x1, y1, x2, y2, is_half]])
         :return: observation (Tensor), reward (float), done (bool), info (dict)
         """
         reward = 0
 
-        # wait for next round
+        # 执行到这里其实还是上一步 等下一回合
         wait_until(next_round(self.crown_ele.text), self.driver)
 
-        # check game state
+        # 先看看游戏是否结束
         state_now = self.win_check()
         if state_now != 0:
             reward = 100 if state_now == 2 else -100
@@ -85,7 +87,7 @@ class OnSiteEnv(gym.Env):
 
         self.update_map()
         try:
-            # game ends when moving
+            # 这里有可能也会结束 因为move比较耗时
             self.move(action)
         except Exception:
             state_now = self.win_check()
@@ -93,19 +95,19 @@ class OnSiteEnv(gym.Env):
                 reward = 100 if state_now == 2 else -100
                 return self.observation, reward, True, {}
 
-        # calc reward
+        # 计算这一步的奖励
         _dirx = [0, -1, 0, 1, 1, -1, 1, -1]
         _diry = [-1, 0, 1, 0, 1, -1, -1, 1]
         last_move = self.action_history.queue[-1]
         last_map = self.map_history.queue[-1]
-        # if bot do an invalid move
+        # 无效移动扣大分
         if last_map[2][last_move[0] - 1][last_move[1] - 1] != self._get_colormark(self.self_color):
             reward -= 100
-        # if bot run into a tower
+        # 撞塔扣分
         if self.map[1][last_move[2] - 1][last_move[3] - 1] == BlockType.city:
             if self.map[2][last_move[2] - 1][last_move[3] - 1] != self._get_colormark(self.self_color):
                 reward -= 10
-        # if bot explored a block
+        # 探索新领地加分 注意 不是占领
         for i in range(8):
             t_x = last_move[2] - 1 + _dirx[i]
             t_y = last_move[3] - 1 + _diry[i]
@@ -113,16 +115,16 @@ class OnSiteEnv(gym.Env):
                 continue
             if self.map[3][t_x][t_y] - last_map[3][t_x][t_y] == 1:
                 reward += explore_reward[self.map[1][t_x][t_y]]
-                # if the block belongs to a player, offer 0.5 reward in addition
+                # 如果探到玩家 额外给0.5
                 if self.map[3][t_x][t_y] != self._get_colormark(PlayerColor.grey):
                     reward += 0.5
 
-        # save action
+        # 保存action
         if self.action_history.qsize() == 3:
             self.action_history.get()
         self.action_history.put(copy.copy(action[0].long()))
 
-        # check again
+        # 再检查一遍 有没有结束
         state_now = self.win_check()
         if state_now != 0:
             reward = 100 if state_now == 2 else -100
@@ -132,7 +134,7 @@ class OnSiteEnv(gym.Env):
 
     def render(self, mode="human"):
         """
-        on site mode do not need function "render"
+        在网站上玩为什么需要渲染 =_=
         :param mode:
         :return:
         """
@@ -140,18 +142,19 @@ class OnSiteEnv(gym.Env):
 
     def init_map(self):
         time.sleep(0.2)
-        # get map size
+        # 获取地图大小
         self._map_data = self.game_table.get_attribute("innerHTML")
         self._blocks = self.block_finder.findall(self._map_data)
         self.map_size = int(math.sqrt(len(self._blocks)))
-        # search for crown
+        # 找自己家
         crown_s = self.driver.find_elements(By.CSS_SELECTOR, ".own.crown")
         self.crown_ele = crown_s[0]
         self.self_color = self._get_color(self.crown_ele.get_attribute("class"))
         cnt1 = len(crown_s)
         cnt2 = int(self.crown_ele.text)
-        # init map
+        # 初始化地图和shown标记
         self.map = torch.zeros([4, self.map_size, self.map_size])
+        self.shown_before = torch.zeros([self.map_size, self.map_size])
         for i in range(3):
             self.map_history.put(copy.copy(self.map))
         self.update_map(True)
@@ -159,41 +162,44 @@ class OnSiteEnv(gym.Env):
 
     def update_map(self, _init_flag=False):
         """
-        update map, also update observation
-        :param _init_flag: True if self.init_map() call this method
+        更新地图 顺便更新observation
+        :param _init_flag: 如果init_map叫我 那就是True
         :return:
         """
-        # pop oldest map and push old map
-        # BE CAREFUL! Don't change data in self.map_history!
+        # 弹出旧地图 压入新地图
+        # 注意 self.map_history中的数据是只读
         if self.map_history.qsize() == 3:
             self.map_history.get()
         self.map_history.put(copy.copy(self.map))
 
         if not _init_flag:
-            # init func will get these below for us
+            # init_map会顺便帮我整这些东西的
             self._map_data = self.game_table.get_attribute("innerHTML")
             # self._blocks[index][0] means class name
             # self._blocks[index][1] means value
             self._blocks = self.block_finder.findall(self._map_data)
-        # to traversal self._blocks
+        # 用于遍历self._blocks
         index = 0
         for i in range(self.map_size):
             for j in range(self.map_size):
                 try:
-                    # get value on that block
+                    # 获取这一格上的兵力
                     b_value = int(self._blocks[index][1])
                 except ValueError:
-                    # if value is 0, it causes error
+                    # 如果是空的 会爆ValueError
                     b_value = 0
                 # get class name
                 b_attr = self._blocks[index][0]
-                # check if it's shown
+                # 看看是否在视野内
                 shown = False if "unshown" in b_attr else True
-                if self.map[3][i][j] == 1 and shown == 0:
-                    # if it has explored before, remain its data, but set shown anyway
+                if int(self.shown_before[i][j]) == 1 and shown == 0:
+                    # 如果以前看到过 保留视野 但shown标记跟随地图
                     self.map[3][i][j] = shown
                     continue
-                # get value and type
+                if shown:
+                    # 只要看到过 就标成1
+                    self.shown_before[i][j] = 1
+                # 获取兵力和类型
                 if "unshown" == b_attr:
                     self.map[0][i][j] = b_value
                     self.map[1][i][j] = BlockType.road
@@ -221,19 +227,13 @@ class OnSiteEnv(gym.Env):
                     b_attr += " grey"
                 # get colormark
                 color = self._get_color(b_attr)
-                if color is None:
-                    print(b_attr)
-                    print(i)
-                    print(j)
-                    print(self._blocks)
-                    exit(1)
                 self.map[2][i][j] = self._get_colormark(color)
                 # set shown
                 self.map[3][i][j] = shown
 
                 index += 1
 
-        # combine 3 frames as observation
+        # 三帧并在一起作为observation
         self.observation = torch.cat((self.map_history.queue[0], self.map_history.queue[1], self.map_history.queue[2]))
         self.observation = self.observation.unsqueeze(0)
 
@@ -245,11 +245,11 @@ class OnSiteEnv(gym.Env):
         """
         move_info = mov[0].long()
         if self.selected[0] != move_info[0] - 1 or self.selected[1] != move_info[1] - 1:
-            # if the block is not selected, then select it
+            # 如果没选中 先点一下
             self.driver.find_element_by_id(f"td-{int((move_info[0] - 1) * self.map_size + move_info[1])}").click()
 
-        # get the direction and press
-        keys = ['w', 'a', 's', 'd']
+        # 获取移动方向 决定按哪个键
+        keys = ['W', 'A', 'S', 'D']
         difx = move_info[2] - move_info[0]
         dify = move_info[3] - move_info[1]
         for i in range(4):
@@ -262,8 +262,8 @@ class OnSiteEnv(gym.Env):
 
     def win_check(self) -> int:
         """
-        also it can be lost :D
-        :return: 0 -> game still going on, 1 -> bot lose, 2 -> bot win
+        虽然也有可能是输了
+        :return: 0 -> 还在打, 1 -> bot寄了, 2 -> bot赢了
         """
         try:
             t = self.driver.find_element(By.ID, "swal2-content")
@@ -275,7 +275,7 @@ class OnSiteEnv(gym.Env):
 
     def enter_room(self, room_id: str):
         """
-        just as the name
+        进房间
         :param room_id: room name
         :return:
         """

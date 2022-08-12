@@ -27,8 +27,8 @@ class next_round(object):
 
 def wait_until(check_func, *args, poll_frequency=0.01):
     """
-    force wait, no time out
-    :param check_func: function to test if it's ok
+    强制等待 不会超时
+    :param check_func: 检测函数
     :param args: arguments
     :param poll_frequency: sleep interval between calls
     :return:
@@ -144,9 +144,9 @@ def print_tensor_map(game_map):
 
 def login(driver):
     """
-    just as the name
-    captcha input required
-    :return: is successful
+    登录
+    需要手动输入验证码
+    :return:
     """
     driver.get("https://kana.byha.top:444/login")
     driver.find_element_by_name("username").send_keys(bot_name)
@@ -176,7 +176,7 @@ def login(driver):
 
 def init_driver_options() -> webdriver.ChromeOptions:
     """
-    just as the name
+    浏览器的设定
     :return: options
     """
     options = webdriver.ChromeOptions()

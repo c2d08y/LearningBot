@@ -2,11 +2,11 @@ import torch
 
 
 class BlockType(object):
-    road = 0  # null, unshown null
-    obstacle = 1  # obstacle
-    mountain = 2  # mountain
-    crown = 3  # crown
-    city = 4  # empty-city, city
+    road = 0                # null, unshown null
+    obstacle = 1            # obstacle
+    mountain = 2            # mountain
+    crown = 3               # crown
+    city = 4                # empty-city, city
 
 
 class PlayerColor(object):
@@ -22,6 +22,9 @@ class PlayerColor(object):
 
 
 explore_reward = {BlockType.road: 0.01, BlockType.mountain: 0.01, BlockType.crown: 10, BlockType.city: 0.01}
+
+
+directions = {'W': (0, -1), 'S': (0, 1), 'A': (-1, 0), 'D': (1, 0)}
 
 
 class FrontColor(object):

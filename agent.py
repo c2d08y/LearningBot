@@ -6,17 +6,17 @@ from utils import *
 class PPOAgent(object):
 
     def __init__(self, args: dict):
-        self.batch_size = args["batch_size"]  # batch size
-        self.lr_a = args["lr_a"]  # Learning rate of actor
-        self.lr_c = args["lr_c"]  # Learning rate of critic
-        self.gamma = args["gamma"]  # Discount factor
-        self.lamda = args["lambda"]  # GAE parameter
-        self.epsilon = args["epsilon"]  # PPO clip parameter
-        self.k_epochs = args["k_epochs"]  # PPO parameter
+        self.batch_size = args["batch_size"]            # batch size
+        self.lr_a = args["lr_a"]                        # 策略网络学习率
+        self.lr_c = args["lr_c"]                        # 价值网络学习率
+        self.gamma = args["gamma"]                      # 折扣因子
+        self.lamda = args["lambda"]                     # GAE λ
+        self.epsilon = args["epsilon"]                  # PPO ε
+        self.k_epochs = args["k_epochs"]                # PPO 训练轮数
         self.entropy_coef = args["entropy_coef"]
-        self.device = args["device"]  # device
+        self.device = args["device"]                    # 运行设备
 
-        # networks
+        # 神经网络
         self.pai_set = {
             20: get_model("actor", "./model/non_maze.pth", 20),
             19: get_model("actor", "./model/maze.pth", 19),
@@ -46,10 +46,10 @@ class PPOAgent(object):
         """
         s, a, a_log_prob, r, s_, dw, done = rep.to_tensor()
 
-        # calculate GAE advantage
+        # 利用GAE计算优势函数
         adv = []
         gae = 0
-        with torch.no_grad():  # adv and v_target have no gradient
+        with torch.no_grad():  # 不需要梯度
             vs = self.v(s)
             vs_ = self.v(s_)
             deltas = r + self.gamma * (1.0 - dw) * vs_ - vs
@@ -59,35 +59,37 @@ class PPOAgent(object):
             adv = torch.tensor(adv, dtype=torch.float).view(-1, 1)
             v_target = adv + vs
 
-        # advantage normalization
+        # 优势归一化
         adv = ((adv - adv.mean()) / (adv.std() + 1e-5))
 
-        # Optimize policy for K epochs:
+        # 参数更新k轮
         for _ in range(self.k_epochs):
             for index in BatchSampler(SubsetRandomSampler(range(self.batch_size)), self.batch_size, False):
                 dist_now = Categorical(self.pai(s[index]))
-                dist_entropy = dist_now.entropy().view(-1, 1)                       # shape(batch_size X 1)
-                a_log_prob_now = dist_now.log_prob(a[index].squeeze()).view(-1, 1)  # shape(batch_size X 1)
+                dist_entropy = dist_now.entropy().view(-1, 1)                       # shape(batch_size x 1)
+                a_log_prob_now = dist_now.log_prob(a[index].squeeze()).view(-1, 1)  # shape(batch_size x 1)
 
                 # https://www.luogu.com.cn/paste/9vwi6ls0
-                ratios = torch.exp(a_log_prob_now - a_log_prob[index])              # shape(batch_size X 1)
+                # 计算策略梯度
+                ratios = torch.exp(a_log_prob_now - a_log_prob[index])              # shape(batch_size x 1)
                 surr1 = ratios * adv[index]
                 surr2 = torch.clamp(ratios, 1 - self.epsilon, 1 + self.epsilon) * adv[index]
                 actor_loss = -torch.min(surr1,
-                                        surr2) - self.entropy_coef * dist_entropy  # shape(batch_size X 1)
-                # Update actor
+                                        surr2) - self.entropy_coef * dist_entropy  # shape(batch_size x 1)
+                # 更新策略网络
                 self.optimizer_actor.zero_grad()
                 actor_loss.mean().backward()
-                # Gradient clip
+                # 梯度裁剪
                 torch.nn.utils.clip_grad_norm_(self.pai.parameters(), 0.5)
                 self.optimizer_actor.step()
 
+                # 价值网络梯度
                 v_s = self.v(s[index])
                 critic_loss = self.mse_loss_fn(v_target[index], v_s)
-                # Update critic
+                # 更新价值网络
                 self.optimizer_critic.zero_grad()
                 critic_loss.backward()
-                # Gradient clip
+                # 梯度裁剪
                 torch.nn.utils.clip_grad_norm_(self.v.parameters(), 0.5)
                 self.optimizer_critic.step()
 
@@ -95,8 +97,8 @@ class PPOAgent(object):
 
     def lr_decay(self, total_steps):
         """
-        learning rate decay
-        :param total_steps:
+        学习率衰减
+        :param total_steps: 已训练步数
         :return:
         """
         decay_rate = 0.1
@@ -110,7 +112,7 @@ class PPOAgent(object):
 
     def predict(self, observation):
         """
-        sample an action from policy network
+        从策略网络采样动作
         :param observation: s_t
         :return: 2 tensors: action, ln(p(a_t|s_t))
         """
@@ -122,7 +124,7 @@ class PPOAgent(object):
 
     def change_network(self, map_size):
         """
-        change policy and value network for a new game
+        当模式更换时 更换神经网络
         :param map_size:
         :return:
         """
@@ -131,7 +133,7 @@ class PPOAgent(object):
 
     def warm_up(self):
         """
-        warm up neural networks
+        预热 因为神经网络第一次跑会比较慢
         :return:
         """
         t = torch.zeros([1, 12, 20, 20]).to(self.device)
@@ -139,13 +141,13 @@ class PPOAgent(object):
         self.v(t)
 
     def save(self):
-        # save policy networks
+        # 保存策略网络
         torch.save(self.pai_set[20], "./model/non_maze.pth")
         torch.save(self.pai_set[10], "./model/non_maze1v1.pth")
         torch.save(self.pai_set[19], "./model/maze.pth")
         torch.save(self.pai_set[9], "./model/maze1v1.pth")
 
-        # save value networks
+        # 保存价值网络
         torch.save(self.v_set[20], "./model/non_maze_critic.pth")
         torch.save(self.v_set[10], "./model/non_maze1v1_critic.pth")
         torch.save(self.v_set[19], "./model/maze_critic.pth")

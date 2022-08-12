@@ -2,6 +2,12 @@ from torch import nn
 
 
 def orthogonal_init(layer, gain=1.0):
+    """
+    正交初始化
+    :param layer: 要初始化的层
+    :param gain: 默认1.0 特别地 对于输出层 应为0.1
+    :return:
+    """
     nn.init.orthogonal_(layer.weight, gain=gain)
     nn.init.constant_(layer.bias, 0)
 
@@ -10,7 +16,7 @@ class Actor(nn.Module):
 
     def __init__(self, size):
         super(Actor, self).__init__()
-        # convolution layers
+        # 卷积层
         self.conv1 = nn.Conv2d(in_channels=12, out_channels=48, kernel_size=(5, 5), padding=2)
         self.batch_norm1 = nn.BatchNorm2d(48)
         self.conv2 = nn.Conv2d(in_channels=48, out_channels=48, kernel_size=(3, 3), padding=1)
@@ -20,17 +26,17 @@ class Actor(nn.Module):
         self.conv4 = nn.Conv2d(in_channels=48, out_channels=48, kernel_size=(3, 3), padding=1)
         self.batch_norm4 = nn.BatchNorm2d(48)
 
-        # dense & softmax
+        # 全连接层和softmax
         self.dense_in = 48 * size ** 2
         self.dense_out = 4 * ((size - 2) ** 2 + 3 * (size - 2) + 2) * 2
         self.dense1 = nn.Linear(in_features=self.dense_in, out_features=self.dense_out)
         self.dense2 = nn.Linear(in_features=self.dense_out, out_features=self.dense_out)
         self.softmax = nn.Softmax(dim=0)
 
-        # activation function
+        # 激活函数
         self.activ_func = nn.Tanh()
 
-        # init
+        # 正交初始化
         orthogonal_init(self.conv1)
         orthogonal_init(self.conv2)
         orthogonal_init(self.conv3)
@@ -69,7 +75,7 @@ class Critic(nn.Module):
 
     def __init__(self, size):
         super(Critic, self).__init__()
-        # convolution layers
+        # 卷积层
         self.conv1 = nn.Conv2d(in_channels=12, out_channels=48, kernel_size=(5, 5), padding=2)
         self.batch_norm1 = nn.BatchNorm2d(48)
         self.conv2 = nn.Conv2d(in_channels=48, out_channels=48, kernel_size=(3, 3), padding=1)
@@ -79,16 +85,16 @@ class Critic(nn.Module):
         self.conv4 = nn.Conv2d(in_channels=48, out_channels=48, kernel_size=(3, 3), padding=1)
         self.batch_norm4 = nn.BatchNorm2d(48)
 
-        # dense
+        # 全连接层
         self.dense_in = 48 * size ** 2
         self.dense_out = 4 * ((size - 2) ** 2 + 3 * (size - 2) + 2) * 2
         self.dense1 = nn.Linear(in_features=self.dense_in, out_features=self.dense_out)
         self.dense2 = nn.Linear(in_features=self.dense_out, out_features=1)
 
-        # activation function
+        # 激活函数
         self.activ_func = nn.Tanh()
 
-        # init
+        # 正交初始化
         orthogonal_init(self.conv1)
         orthogonal_init(self.conv2)
         orthogonal_init(self.conv3)

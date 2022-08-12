@@ -9,7 +9,7 @@ from replay_buffer import *
 def main(train=True):
     env = OffSiteEnv() if train else OnSiteEnv()
 
-    total_steps = 0  # Record the total steps during the training
+    total_steps = 0  # 记录总步数
 
     device = torch.device("cuda")
     args = {
@@ -30,16 +30,16 @@ def main(train=True):
     agent = PPOAgent(args)
     agent.warm_up()
 
-    # Build a tensorboard
+    # 绘图器
     writer = SummaryWriter("offline_train_logs" if train else "online_train_logs")
 
     while True:
         s = env.reset()
-        # arguments update per game
+        # 更新地图大小并更换神经网络
         args["state_dim"] = env.map_size
         agent.change_network(env.map_size)
 
-        # init normalizations
+        # 初始化一些用于归一化的类
         state_norm = Normalization(shape=args["state_dim"])  # Trick 2:state normalization
         reward_scaling = RewardScaling(shape=1, gamma=args["gamma"])
 
@@ -60,11 +60,12 @@ def main(train=True):
             s = s_
             total_steps += 1
 
-            # When the number of transitions in buffer reaches batch_size,then update
+            # 缓存到达batch size的时候更新参数
             if len(replay_buffer) == args["batch_size"]:
                 agent.learn(replay_buffer, total_steps)
                 replay_buffer.clear()
 
+            # 自动保存模型 batch_size和autosave step的最小公倍数尽量大 因为同时保存和更新比较耗时间
             if total_steps % args["autosave_step"] == 0:
                 agent.save()
 
