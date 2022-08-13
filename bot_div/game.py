@@ -327,9 +327,9 @@ class Game(object):
         self.cur_y = y
 
     def flush_movements(self):  # 更新移动
-        is_half = False
+        is_half = 0
         if 'Z' in self.movements:
-            is_half = True
+            is_half = 1
         tmp = self.mp.mp[self.home_x][self.home_y].amount
         cur_movement = self.movements[0]
         while isinstance(cur_movement, list) or isinstance(cur_movement, tuple):
@@ -338,9 +338,8 @@ class Game(object):
             if not self.movements:
                 return
             cur_movement = self.movements[0]
-        act = torch.LongTensor([self.cur_x, self.cur_y,
-                                self.cur_x + directions[cur_movement][0],
-                                self.cur_y + directions[cur_movement][1]], is_half)
+        act = [self.cur_x, self.cur_y, self.cur_x + directions[cur_movement][0],
+               self.cur_y + directions[cur_movement][1], is_half]
         self.send_action(self.color, act)
         if self.movements[0] == 'W':
             self.cur_x -= 1

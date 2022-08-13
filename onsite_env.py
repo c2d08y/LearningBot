@@ -82,7 +82,7 @@ class OnSiteEnv(gym.Env):
         # 先看看游戏是否结束
         state_now = self.win_check()
         if state_now != 0:
-            reward = 100 if state_now == 2 else -100
+            reward = 300 if state_now == 2 else -300
             return self.observation, reward, True, {}
 
         self.update_map()
@@ -92,7 +92,7 @@ class OnSiteEnv(gym.Env):
         except Exception:
             state_now = self.win_check()
             if state_now != 0:
-                reward = 100 if state_now == 2 else -100
+                reward = 300 if state_now == 2 else -300
                 return self.observation, reward, True, {}
 
         # 计算这一步的奖励
@@ -127,7 +127,7 @@ class OnSiteEnv(gym.Env):
         # 再检查一遍 有没有结束
         state_now = self.win_check()
         if state_now != 0:
-            reward = 100 if state_now == 2 else -100
+            reward = 300 if state_now == 2 else -300
             return self.observation, reward, True, {}
 
         return self.observation, reward, False, {}

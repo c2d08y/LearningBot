@@ -6,8 +6,8 @@ from normalization import *
 from replay_buffer import *
 
 
-def main(train=True):
-    env = OffSiteEnv() if train else OnSiteEnv()
+def main(offline_train=True):
+    env = OffSiteEnv() if offline_train else OnSiteEnv()
 
     total_steps = 0  # 记录总步数
 
@@ -31,7 +31,7 @@ def main(train=True):
     agent.warm_up()
 
     # 绘图器
-    writer = SummaryWriter("offline_train_logs" if train else "online_train_logs")
+    writer = SummaryWriter("offline_train_logs" if offline_train else "online_train_logs")
 
     while True:
         s = env.reset()

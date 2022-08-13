@@ -14,9 +14,11 @@ class OffSiteEnv(gym.Env):
         # LearningBot相关
         self.learningbot_color = PlayerColor.red
         self.map_history = queue.Queue()
+        self.action_history = queue.Queue()
 
         # others
         self.map = None
+        self.round = 0
         self.mode = mode
         self.episode = 0
         self.small_map = False if "1v1" not in mode else True
@@ -34,7 +36,7 @@ class OffSiteEnv(gym.Env):
         for i in range(1, 9):
             if i != self.learningbot_color:
                 self.internal_bots_color.append(i)
-        self.actions_now = [0, 0, 0, 0, 0, 0, 0, 0]
+        self.actions_now = [[], [], [], [], [], [], [], []]
 
     def reset(self):
         """
@@ -67,18 +69,130 @@ class OffSiteEnv(gym.Env):
         self.map_history.put(copy.copy(self.get_view_of(self.learningbot_color)))
         return self.gen_observation()
 
-    def step(self, action):
-        pass
+    def step(self, action: torch.Tensor):
+        """
+        执行一步
+        :param action: movement => tensor([[x1, y1, x2, y2, is_half]])
+        :return: observation (Tensor), reward (float), done (bool), info (dict)
+        """
+        # 运行
+        self.round += 1
+        self.add_amount_crown_and_city()
+        if self.round % 10 == 0:
+            self.add_amount_road()
+
+        # 执行动作
+        self.execute_actions(action[0].long())
+
+        # 计算奖励
+        reward = 0
+
+        # 收尾 保存LearningBot动作 生成observation
+        obs = self.gen_observation()
+        self.action_history.put(action[0].long())
+
+        # 只有动作都执行完才需要检查游戏是否结束
+        w_state = self.win_check()
+        if w_state != 0:
+            reward += 300 if w_state == 2 else -300
+            return obs, reward, True, {}
+        return obs, reward, False, {}
 
     def render(self, mode="human"):
+        """
+        渲染 打印当前帧画面
+        :param mode: human就是给人看的 要不然就不打印出来
+        :return:
+        """
         if mode == "human":
             print_tensor_map(self.map)
 
-    def find_home(self):
-        pass
+    def execute_actions(self, action: torch.Tensor):
+        """
+        执行动作
+        :param action: LearningBot的动作 内置bot动作会存到类变量里边 不需要传参
+        :return:
+        """
+        # 处理内置bot动作
+        for i in range(self.internal_bots_num):
+            cur_color = self.internal_bots_color[i]
+            if not self.actions_now[cur_color]:
+                continue
+            cur_action = self.actions_now[cur_color]
+            f_amount = int(self.map[0][cur_action[0]][cur_action[1]])
+            if cur_action[4] == 1:
+                mov_troop = math.ceil((f_amount + 0.5) / 2) - 1
+            else:
+                mov_troop = f_amount - 1
+            self.combine((cur_action[0], cur_action[1]), (cur_action[2], cur_action[3]), mov_troop)
 
-    def update_map(self, actions):
-        pass
+        # 处理LearningBot动作
+        act = action.tolist()
+        f_amount = int(self.map[0][act[0]][act[1]])
+        if act[4] == 1:
+            mov_troop = math.ceil((f_amount + 0.5) / 2) - 1
+        else:
+            mov_troop = f_amount - 1
+        self.combine((act[0], act[1]), (act[2], act[3]), mov_troop)
+
+    def combine(self, b1: tuple, b2: tuple, cnt):
+        """
+        两格合并
+        :param b1: from
+        :param b2: target
+        :param cnt: 从b1过来的兵力
+        :return:
+        """
+        f = {
+            "amount": int(self.map[0][b1[0]][b1[1]]),
+            "type": int(self.map[1][b1[0]][b1[1]]),
+            "color": int(self.map[2][b1[0]][b1[1]])
+        }
+        t = {
+            "amount": int(self.map[0][b2[0]][b2[1]]),
+            "type": int(self.map[1][b2[0]][b2[1]]),
+            "color": int(self.map[2][b2[0]][b2[1]])
+        }
+
+        if t["color"] == f["color"]:
+            t["amount"] += cnt
+            f["amount"] -= cnt
+        else:
+            t["amount"] -= cnt
+            f["amount"] -= cnt
+            if t["amount"] < 0:
+                if t["type"] == BlockType.crown:
+                    tcolor = t["color"]
+                    for i in range(self.map_size):
+                        for j in range(self.map_size):
+                            if self.map[2][i][j] == tcolor:
+                                self.map[2][i][j] = f["color"]
+                                if self.map[2][i][j] == BlockType.crown:
+                                    self.map[2][i][j] = BlockType.city
+                t["color"] = f["color"]
+                t["amount"] = f["amount"]
+
+        # 赋值回去
+        self.map[0][b1[0]][b1[1]] = f["amount"]
+        self.map[1][b1[0]][b1[1]] = f["type"]
+        self.map[2][b1[0]][b1[1]] = f["color"]
+        self.map[0][b2[0]][b2[1]] = t["amount"]
+        self.map[1][b2[0]][b2[1]] = t["type"]
+        self.map[2][b2[0]][b2[1]] = t["color"]
+
+    def add_amount_road(self):
+        for i in range(self.map_size):
+            for j in range(self.map_size):
+                if self.map[2][i][j] != PlayerColor.grey and self.map[1][i][j] == BlockType.road:
+                    self.map[0][i][j] += 1
+
+    def add_amount_crown_and_city(self):
+        for i in range(self.map_size):
+            for j in range(self.map_size):
+                if self.map[2][i][j] != PlayerColor.grey:
+                    continue
+                if self.map[1][i][j] == BlockType.crown or self.map[1][i][j] == BlockType.city:
+                    self.map[0][i][j] += 1
 
     def gen_map(self, player_num):
         if self.mode == "non_maze" or self.mode == "non_maze1v1":
@@ -114,7 +228,7 @@ class OffSiteEnv(gym.Env):
                     map_filtered[1][i][j] = self.map[1][i][j]
                     map_filtered[2][i][j] = self._get_colormark(self.map[2][i][j])
                 self.shown[color][i][j] = vis
-        return torch.cat((map_filtered, self.shown[color].unsqueeze()))
+        return torch.cat((map_filtered, self.shown[color].unsqueeze(0)))
 
     def visible(self, color, x, y):
         for i in range(4):
@@ -142,6 +256,22 @@ class OffSiteEnv(gym.Env):
         :return:
         """
         if action:
-            self.actions_now[color] = torch.LongTensor(action)
+            self.actions_now[color] = action
         else:
-            self.actions_now[color] = torch.LongTensor([0, 0, 0, 0, 0])
+            self.actions_now[color] = False
+
+    def win_check(self):
+        """
+        检查是否结束
+        :return: :return: 0 -> 还在打, 1 -> bot寄了, 2 -> bot赢了
+        """
+        alive = []
+        for i in range(self.map_size):
+            for j in range(self.map_size):
+                if int(self.map[2][i][j]) not in alive:
+                    alive.append(int(self.map[2][i][j]))
+                if len(alive) > 1:
+                    return 0
+        if alive[0] == self.learningbot_color:
+            return 2
+        return 1
