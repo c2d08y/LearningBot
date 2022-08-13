@@ -18,19 +18,19 @@ class PPOAgent(object):
 
         # 神经网络
         self.pai_set = {
-            20: get_model("actor", "./model/non_maze.pth", 20),
-            19: get_model("actor", "./model/maze.pth", 19),
-            10: get_model("actor", "./model/non_maze1v1.pth", 10),
-            9: get_model("actor", "./model/maze1v1.pth", 9)
+            20: get_model("actor", "./model/non_maze.pth", 20).to(self.device),
+            19: get_model("actor", "./model/maze.pth", 19).to(self.device),
+            10: get_model("actor", "./model/non_maze1v1.pth", 10).to(self.device),
+            9: get_model("actor", "./model/maze1v1.pth", 9).to(self.device)
         }
         self.v_set = {
-            20: get_model("critic", "./model/non_maze_critic.pth", 20),
-            19: get_model("critic", "./model/maze_critic.pth", 19),
-            10: get_model("critic", "./model/non_maze1v1_critic.pth", 10),
-            9: get_model("critic", "./model/maze1v1_critic.pth", 9)
+            20: get_model("critic", "./model/non_maze_critic.pth", 20).to(self.device),
+            19: get_model("critic", "./model/maze_critic.pth", 19).to(self.device),
+            10: get_model("critic", "./model/non_maze1v1_critic.pth", 10).to(self.device),
+            9: get_model("critic", "./model/maze1v1_critic.pth", 9).to(self.device)
         }
-        self.pai = self.pai_set[0]
-        self.v = self.v_set[0]
+        self.pai = self.pai_set[20]
+        self.v = self.v_set[20]
         self.optimizer_actor = torch.optim.Adam(self.pai.parameters(), lr=self.lr_a, eps=1e-5)
         self.optimizer_critic = torch.optim.Adam(self.v.parameters(), lr=self.lr_c, eps=1e-5)
 

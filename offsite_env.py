@@ -15,6 +15,7 @@ class OffSiteEnv(gym.Env):
         self.learningbot_color = PlayerColor.red
         self.map_history = queue.Queue()
         self.action_history = queue.Queue()
+        self.at = ActionTranslator()
 
         # others
         self.map = None
@@ -127,7 +128,7 @@ class OffSiteEnv(gym.Env):
             self.combine((cur_action[0], cur_action[1]), (cur_action[2], cur_action[3]), mov_troop)
 
         # 处理LearningBot动作
-        act = action.tolist()
+        act = self.at.i_to_a(self.map_size, int(action))[0].long()
         f_amount = int(self.map[0][act[0]][act[1]])
         if act[4] == 1:
             mov_troop = math.ceil((f_amount + 0.5) / 2) - 1
@@ -234,7 +235,7 @@ class OffSiteEnv(gym.Env):
         for i in range(4):
             tgx = x + dx[i]
             tgy = y + dy[i]
-            if tgx < 1 or tgx > self.map_size or tgy < 1 or tgy > self.map_size:
+            if tgx < 1 or tgx >= self.map_size or tgy < 1 or tgy >= self.map_size:
                 continue
             if self.map[2][tgx][tgy] == color:
                 return True

@@ -5,7 +5,7 @@ import numpy as np
 class ReplayBuffer(object):
 
     def __init__(self, args: dict):
-        self.s = np.zeros((args["batch_size"], args["map_size"]))
+        self.s = np.zeros((args["batch_size"], args["state_dim"]))
         self.a = np.zeros((args["batch_size"], 1))
         self.a_log_prob = np.zeros((args["batch_size"], 1))
         self.r = np.zeros((args["batch_size"], 1))

@@ -1,7 +1,7 @@
 import copy
 import random
 from const import *
-from map import *
+from bot_div.map import *
 
 
 class Error(Exception):

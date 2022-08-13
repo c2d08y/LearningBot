@@ -43,7 +43,12 @@ class RewardScaling(object):
         self.R = np.zeros(self.shape)
 
     def __call__(self, x):
-        self.R = self.gamma * self.R + x
+        try:
+            self.R = self.gamma * self.R + x
+        except TypeError:
+            print(self.R)
+            print(self.gamma)
+            exit(1)
         self.running_ms.update(self.R)
         x = x / (self.running_ms.std + 1e-8)
         return x

@@ -45,7 +45,7 @@ def main(offline_train=True):
 
         replay_buffer = ReplayBuffer(args)
 
-        s = state_norm(s)
+        s = state_norm(s).to(device)
         reward_scaling.reset()
 
         done = False
@@ -53,7 +53,7 @@ def main(offline_train=True):
             a, a_log_prob = agent.predict(s)
             s_, r, done, _ = env.step(a)
 
-            s_ = state_norm(s_)
+            s_ = state_norm(s_).to(device)
             r = reward_scaling(r)
 
             replay_buffer.store(s, a, a_log_prob, r, s_, done)
@@ -75,3 +75,20 @@ def main(offline_train=True):
 
 if __name__ == '__main__':
     main()
+
+"""
+Traceback (most recent call last):
+  File "D:/MyFiles/LearningBot/main.py", line 77, in <module>
+    main()
+  File "D:/MyFiles/LearningBot/main.py", line 54, in main
+    s_, r, done, _ = env.step(a)
+  File "D:\MyFiles\LearningBot\offsite_env.py", line 86, in step
+    self.execute_actions(action[0].long())
+  File "D:\MyFiles\LearningBot\offsite_env.py", line 137, in execute_actions
+    self.combine((act[0], act[1]), (act[2], act[3]), mov_troop)
+  File "D:\MyFiles\LearningBot\offsite_env.py", line 153, in combine
+    "amount": int(self.map[0][b2[0]][b2[1]]),
+IndexError: index 20 is out of bounds for dimension 0 with size 20
+
+Process finished with exit code 1
+"""

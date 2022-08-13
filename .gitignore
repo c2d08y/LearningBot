@@ -4,3 +4,5 @@ settings.py
 model/
 __pycache__/
 .idea/
+offline_train_logs/
+online_train_logs/
