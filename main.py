@@ -18,11 +18,11 @@ def main(offline_train=True):
         "action_dim": 5,
         "lr_a": 0.01,
         "lr_c": 0.01,
-        "gamma": None,
-        "lambda": None,
-        "epsilon": None,
-        "k_epochs": None,
-        "entropy_coef": None,
+        "gamma": 0.99,
+        "lambda": 0.95,
+        "epsilon": 0.2,
+        "k_epochs": 10,
+        "entropy_coef": 0.01,
         "autosave_step": 107,
         "device": device
     }
@@ -53,6 +53,8 @@ def main(offline_train=True):
             a, a_log_prob = agent.predict(s)
             s_, r, done, _ = env.step(a)
 
+            env.render("human")
+
             s_ = state_norm(s_).to(device)
             r = reward_scaling(r)
 
@@ -78,17 +80,17 @@ if __name__ == '__main__':
 
 """
 Traceback (most recent call last):
-  File "D:/MyFiles/LearningBot/main.py", line 77, in <module>
+  File "D:/MyFiles/LearningBot/main.py", line 79, in <module>
     main()
   File "D:/MyFiles/LearningBot/main.py", line 54, in main
     s_, r, done, _ = env.step(a)
-  File "D:\MyFiles\LearningBot\offsite_env.py", line 86, in step
+  File "D:\MyFiles\LearningBot\offsite_env.py", line 85, in step
     self.execute_actions(action[0].long())
-  File "D:\MyFiles\LearningBot\offsite_env.py", line 137, in execute_actions
-    self.combine((act[0], act[1]), (act[2], act[3]), mov_troop)
-  File "D:\MyFiles\LearningBot\offsite_env.py", line 153, in combine
-    "amount": int(self.map[0][b2[0]][b2[1]]),
-IndexError: index 20 is out of bounds for dimension 0 with size 20
-
-Process finished with exit code 1
+  File "D:\MyFiles\LearningBot\offsite_env.py", line 156, in execute_actions
+    self.internal_bots[cur_color].bot_move()
+  File "D:\MyFiles\LearningBot\bot_div\game.py", line 365, in bot_move
+    self.flush_movements()
+  File "D:\MyFiles\LearningBot\bot_div\game.py", line 341, in flush_movements
+    act = [self.cur_x, self.cur_y, self.cur_x + directions[cur_movement][0],
+KeyError: 'Z'
 """

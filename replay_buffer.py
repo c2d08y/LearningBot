@@ -1,16 +1,15 @@
 import torch
-import numpy as np
 
 
 class ReplayBuffer(object):
 
     def __init__(self, args: dict):
-        self.s = np.zeros((args["batch_size"], args["state_dim"]))
-        self.a = np.zeros((args["batch_size"], 1))
-        self.a_log_prob = np.zeros((args["batch_size"], 1))
-        self.r = np.zeros((args["batch_size"], 1))
-        self.s_ = np.zeros((args["batch_size"], args["state_dim"]))
-        self.done = np.zeros((args["batch_size"], 1))
+        self.s = torch.zeros((args["batch_size"], 12, args["state_dim"], args["state_dim"]))
+        self.a = torch.zeros((args["batch_size"], 1))
+        self.a_log_prob = torch.zeros((args["batch_size"], 1))
+        self.r = torch.zeros((args["batch_size"], 1))
+        self.s_ = torch.zeros((args["batch_size"], 12, args["state_dim"], args["state_dim"]))
+        self.done = torch.zeros((args["batch_size"], 1))
         self.size = 0
 
     def __len__(self):
@@ -28,12 +27,5 @@ class ReplayBuffer(object):
         self.done[self.size] = done
         self.size += 1
 
-    def to_tensor(self):
-        s = torch.tensor(self.s, dtype=torch.float)
-        a = torch.tensor(self.a, dtype=torch.long)
-        a_log_prob = torch.tensor(self.a_log_prob, dtype=torch.float)
-        r = torch.tensor(self.r, dtype=torch.float)
-        s_ = torch.tensor(self.s_, dtype=torch.float)
-        done = torch.tensor(self.done, dtype=torch.float)
-
-        return s, a, a_log_prob, r, s_, done
+    def get_data(self):
+        return self.s, self.a, self.a_log_prob, self.r, self.s_, self.done

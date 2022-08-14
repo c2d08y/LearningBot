@@ -1,25 +1,26 @@
-import numpy as np
+import copy
+import torch
 
 
 class RunningMeanStd(object):
 
     def __init__(self, shape):
         self.n = 0
-        self.mean = np.zeros(shape)
-        self.S = np.zeros(shape)
-        self.std = np.sqrt(self.S)
+        self.mean = torch.zeros(shape)
+        self.S = torch.zeros(shape)
+        self.std = torch.sqrt(self.S)
 
     def update(self, x):
-        x = np.array(x)
+        x = torch.tensor(x)
         self.n += 1
         if self.n == 1:
             self.mean = x
             self.std = x
         else:
-            old_mean = self.mean.copy()
+            old_mean = copy.copy(self.mean)
             self.mean = old_mean + (x - old_mean) / self.n
             self.S = self.S + (x - old_mean) * (x - self.mean)
-            self.std = np.sqrt(self.S / self.n)
+            self.std = torch.sqrt(self.S / self.n)
 
 
 class Normalization(object):
@@ -40,18 +41,13 @@ class RewardScaling(object):
         self.shape = shape
         self.gamma = gamma
         self.running_ms = RunningMeanStd(shape=self.shape)
-        self.R = np.zeros(self.shape)
+        self.R = torch.zeros(self.shape)
 
     def __call__(self, x):
-        try:
-            self.R = self.gamma * self.R + x
-        except TypeError:
-            print(self.R)
-            print(self.gamma)
-            exit(1)
+        self.R = self.gamma * self.R + x
         self.running_ms.update(self.R)
         x = x / (self.running_ms.std + 1e-8)
         return x
 
     def reset(self):
-        self.R = np.zeros(self.shape)
+        self.R = torch.zeros(self.shape)

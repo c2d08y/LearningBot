@@ -44,7 +44,7 @@ class PPOAgent(object):
         :param step_t:
         :return:
         """
-        s, a, a_log_prob, r, s_, dw, done = rep.to_tensor()
+        s, a, a_log_prob, r, s_, dw, done = rep.get_data()
 
         # 利用GAE计算优势函数
         adv = []

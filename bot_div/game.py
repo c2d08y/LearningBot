@@ -14,7 +14,7 @@ class MapSizeError(Error):
 
 
 class Game(object):
-    def __init__(self, map_upd_func, action_upd_func):
+    def __init__(self, bot_color, map_upd_func, action_upd_func):
         self.driver = None
         self.mp = Map()
         self.players = []
@@ -29,17 +29,19 @@ class Game(object):
         self.useless = []
         self.land_before = []
         self.defending = False
-        self.color = None
+        self.bot_color = bot_color
         self.get_tensor_map = map_upd_func
         self.send_action = action_upd_func
+        self.is_half = False
 
     def get_map_from_env(self):
         """
         get map from environment
         :return:
         """
-        game_map = self.get_tensor_map(self.color)
+        game_map = self.get_tensor_map(self.bot_color)
         map_size = game_map.shape[1]
+        game_map = game_map.long().tolist()
         for i in range(map_size):
             for j in range(map_size):
                 if game_map[1][i][j] == BlockType.city:
@@ -51,7 +53,8 @@ class Game(object):
                     self.mp.mp[i][j].type = 'general'
                 elif game_map[1][i][j] == BlockType.mountain or game_map[1][i][j] == BlockType.obstacle:
                     self.mp.mp[i][j].type = 'mountain'
-                elif game_map[1][i][j] == BlockType.road and game_map[2][i][j] == PlayerColor.grey:
+                elif game_map[1][i][j] == BlockType.road and game_map[2][i][j] == PlayerColor.grey\
+                        and game_map[3][i][j] != 0:
                     if game_map[2][i][j] == PlayerColor.grey:
                         self.mp.mp[i][j].type = 'empty'
                     else:
@@ -59,7 +62,7 @@ class Game(object):
                 else:
                     self.mp.mp[i][j].type = 'unknown'
 
-                if game_map[2][i][j] == self.color:
+                if game_map[2][i][j] == self.bot_color:
                     self.mp.mp[i][j].belong = 1
                 else:
                     self.mp.mp[i][j].belong = 0
@@ -71,12 +74,10 @@ class Game(object):
                 else:
                     self.mp.mp[i][j].cost = 1
 
-    def set_color(self, color):
-        self.color = color
-
     def pre(self):  # 预处理地图
         tmp = self.mp.find_match(lambda a: a.type == 'general' and a.belong == 1)
         if len(tmp) != 1:
+            print("")
             return 1
         self.home_x = tmp[0][0]
         self.home_y = tmp[0][1]
@@ -340,7 +341,7 @@ class Game(object):
             cur_movement = self.movements[0]
         act = [self.cur_x, self.cur_y, self.cur_x + directions[cur_movement][0],
                self.cur_y + directions[cur_movement][1], is_half]
-        self.send_action(self.color, act)
+        self.send_action(self.bot_color, act)
         if self.movements[0] == 'W':
             self.cur_x -= 1
         elif self.movements[0] == 'S':
@@ -350,17 +351,18 @@ class Game(object):
         elif self.movements[0] == 'D':
             self.cur_y += 1
         self.movements.pop(0)
-        self.get_tensor_map()
+        self.get_map_from_env()
         self.update_map()
-        self.get_tensor_map()
+        self.get_map_from_env()
         return
 
     def bot_move(self):  # 主循环，每回合执行一次
-        self.get_tensor_map()
+        self.get_map_from_env()
         if not self.is_pre:
             if self.pre() == 1:
                 return
-        if self.movements:
+        if len(self.movements):
+            print("flushed")
             self.flush_movements()
             return
         if [self.cur_x, self.cur_y] not in self.vis:

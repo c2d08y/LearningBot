@@ -95,7 +95,7 @@ class OnSiteEnv(gym.Env):
                 reward = 300 if state_now == 2 else -300
                 return self.observation, reward, True, {}
 
-        # 计算这一步的奖励
+        # 计算上一步的奖励
         _dirx = [0, -1, 0, 1, 1, -1, 1, -1]
         _diry = [-1, 0, 1, 0, 1, -1, -1, 1]
         last_move = self.action_history.queue[-1]
