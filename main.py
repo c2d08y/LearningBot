@@ -77,20 +77,3 @@ def main(offline_train=True):
 
 if __name__ == '__main__':
     main()
-
-"""
-Traceback (most recent call last):
-  File "D:/MyFiles/LearningBot/main.py", line 79, in <module>
-    main()
-  File "D:/MyFiles/LearningBot/main.py", line 54, in main
-    s_, r, done, _ = env.step(a)
-  File "D:\MyFiles\LearningBot\offsite_env.py", line 85, in step
-    self.execute_actions(action[0].long())
-  File "D:\MyFiles\LearningBot\offsite_env.py", line 156, in execute_actions
-    self.internal_bots[cur_color].bot_move()
-  File "D:\MyFiles\LearningBot\bot_div\game.py", line 365, in bot_move
-    self.flush_movements()
-  File "D:\MyFiles\LearningBot\bot_div\game.py", line 341, in flush_movements
-    act = [self.cur_x, self.cur_y, self.cur_x + directions[cur_movement][0],
-KeyError: 'Z'
-"""

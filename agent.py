@@ -44,15 +44,17 @@ class PPOAgent(object):
         :param step_t:
         :return:
         """
-        s, a, a_log_prob, r, s_, dw, done = rep.get_data()
+        s, a, a_log_prob, r, s_, done = rep.get_data()
 
         # 利用GAE计算优势函数
         adv = []
         gae = 0
+        s = s.to(self.device)
+        s_ = s_.to(self.device)
         with torch.no_grad():  # 不需要梯度
             vs = self.v(s)
             vs_ = self.v(s_)
-            deltas = r + self.gamma * (1.0 - dw) * vs_ - vs
+            deltas = r + self.gamma * (1.0 - done) * vs_ - vs
             for delta, d in zip(reversed(deltas.flatten().numpy()), reversed(done.flatten().numpy())):
                 gae = delta + self.gamma * self.lamda * gae * (1.0 - d)
                 adv.insert(0, gae)

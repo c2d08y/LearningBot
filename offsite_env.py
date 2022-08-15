@@ -87,16 +87,24 @@ class OffSiteEnv(gym.Env):
         # 生成observation
         obs = self.gen_observation()
 
-        # 计算奖励
+        # 只有动作都执行完才需要检查游戏是否结束
         reward = 0
-        # 如果是第一回合 直接return
-        if self.action_history.qsize() < 1:
-            return obs, reward, False, {}
+        w_state = self.win_check()
+        if w_state != 0:
+            reward += 300 if w_state == 2 else -300
+            return obs, reward, True, {}
+
         # 计算上一步的奖励
         _dirx = [0, -1, 0, 1, 1, -1, 1, -1]
         _diry = [-1, 0, 1, 0, 1, -1, -1, 1]
+        # 如果是第一回合 直接return
+        if self.action_history.qsize() < 1:
+            return obs, reward, False, {}
         last_move = self.action_history.queue[-1]
         last_obs = self.obs_history.queue[-1]
+        # 如果动作为空
+        if last_move[0] < 0:
+            return obs, reward, False, {}
         # 无效移动扣大分
         if last_obs[2][last_move[0] - 1][last_move[1] - 1] != self._get_colormark(self.learningbot_color):
             reward -= 100
@@ -126,11 +134,6 @@ class OffSiteEnv(gym.Env):
             self.obs_history.get()
         self.obs_history.put(self.get_view_of(self.learningbot_color))
 
-        # 只有动作都执行完才需要检查游戏是否结束
-        w_state = self.win_check()
-        if w_state != 0:
-            reward += 300 if w_state == 2 else -300
-            return obs, reward, True, {}
         return obs, reward, False, {}
 
     def render(self, mode="human"):
@@ -142,7 +145,7 @@ class OffSiteEnv(gym.Env):
         if mode == "human":
             print_tensor_map(self.map)
             print(f"round: {self.round}")
-            time.sleep(1)
+            time.sleep(0.65)
 
     def execute_actions(self, action: torch.Tensor):
         """
@@ -155,22 +158,35 @@ class OffSiteEnv(gym.Env):
             cur_color = self.internal_bots_color[i]
             self.internal_bots[cur_color].bot_move()
             if not self.actions_now[cur_color]:
+                print(f"bot {cur_color} empty move")
                 continue
             cur_action = self.actions_now[cur_color]
-            print(cur_action)
-            f_amount = int(self.map[0][cur_action[0]][cur_action[1]])
-            if cur_action[4] == 1:
-                mov_troop = math.ceil((f_amount + 0.5) / 2) - 1
-            else:
-                mov_troop = f_amount - 1
-            self.combine((cur_action[0], cur_action[1]), (cur_action[2], cur_action[3]), mov_troop)
+            # 如果移动超界了 直接下一个
+            skip = False
+            for j in range(4):
+                if not 0 <= cur_action[j] < self.map_size:
+                    skip = True
+                    break
+            if skip:
+                print(f"skipped: {cur_action}")
+                continue
+
+            print(f"internal bot color {cur_color}: {cur_action}")
+            # 检查动作是否合法
+            if cur_action[0] >= 0 and self.map[2][cur_action[0]][cur_action[1]] == cur_color:
+                f_amount = int(self.map[0][cur_action[0]][cur_action[1]])
+                if cur_action[4] == 1:
+                    mov_troop = math.ceil((f_amount + 0.5) / 2) - 1
+                else:
+                    mov_troop = f_amount - 1
+                self.combine((cur_action[0], cur_action[1]), (cur_action[2], cur_action[3]), mov_troop)
 
         # 处理LearningBot动作
         act = self.at.i_to_a(self.map_size, int(action))[0].long()
         act -= 1
         act[4] += 1
         # 检查动作是否合法
-        if self.map[2][act[0]][act[1]] == self.learningbot_color:
+        if act[0] >= 0 and self.map[2][act[0]][act[1]] == self.learningbot_color:
             f_amount = int(self.map[0][act[0]][act[1]])
             if act[4] == 1:
                 mov_troop = math.ceil((f_amount + 0.5) / 2) - 1
@@ -197,6 +213,10 @@ class OffSiteEnv(gym.Env):
             "color": int(self.map[2][b2[0]][b2[1]])
         }
 
+        # 地形特判
+        if t["type"] == BlockType.mountain:
+            return
+
         if t["color"] == f["color"]:
             t["amount"] += cnt
             f["amount"] -= cnt
@@ -213,7 +233,7 @@ class OffSiteEnv(gym.Env):
                                 if self.map[2][i][j] == BlockType.crown:
                                     self.map[2][i][j] = BlockType.city
                 t["color"] = f["color"]
-                t["amount"] = f["amount"]
+                t["amount"] = -t["amount"]
 
         # 赋值回去
         self.map[0][b1[0]][b1[1]] = f["amount"]
@@ -303,9 +323,13 @@ class OffSiteEnv(gym.Env):
         :param action: [x1, y1, x2, y2, is_half]
         :return:
         """
-        print(f"internal bot color {color}: {action}")
         if action:
-            self.actions_now[color] = action
+            self.actions_now[color] = [None, None, None, None, None]
+            self.actions_now[color][0] = action[0] - 1
+            self.actions_now[color][1] = action[1] - 1
+            self.actions_now[color][2] = action[2] - 1
+            self.actions_now[color][3] = action[3] - 1
+            self.actions_now[color][4] = action[4]
         else:
             self.actions_now[color] = False
 

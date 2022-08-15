@@ -42,32 +42,32 @@ class Game(object):
         game_map = self.get_tensor_map(self.bot_color)
         map_size = game_map.shape[1]
         game_map = game_map.long().tolist()
-        for i in range(map_size):
-            for j in range(map_size):
-                if game_map[1][i][j] == BlockType.city:
-                    if game_map[2][i][j] == PlayerColor.grey:
+        for i in range(1, map_size + 1):
+            for j in range(1, map_size + 1):
+                if game_map[1][i - 1][j - 1] == BlockType.city:
+                    if game_map[2][i - 1][j - 1] == PlayerColor.grey:
                         self.mp.mp[i][j].type = 'empty-city'
                     else:
                         self.mp.mp[i][j].type = 'city'
-                elif game_map[1][i][j] == BlockType.crown:
+                elif game_map[1][i - 1][j - 1] == BlockType.crown:
                     self.mp.mp[i][j].type = 'general'
-                elif game_map[1][i][j] == BlockType.mountain or game_map[1][i][j] == BlockType.obstacle:
+                elif game_map[1][i - 1][j - 1] == BlockType.mountain or game_map[1][i - 1][j - 1] == BlockType.obstacle:
                     self.mp.mp[i][j].type = 'mountain'
-                elif game_map[1][i][j] == BlockType.road and game_map[2][i][j] == PlayerColor.grey\
-                        and game_map[3][i][j] != 0:
-                    if game_map[2][i][j] == PlayerColor.grey:
+                elif game_map[1][i - 1][j - 1] == BlockType.road and game_map[2][i - 1][j - 1] == PlayerColor.grey\
+                        and game_map[3][i - 1][j - 1] != 0:
+                    if game_map[2][i - 1][j - 1] == PlayerColor.grey:
                         self.mp.mp[i][j].type = 'empty'
                     else:
                         self.mp.mp[i][j].type = 'land'
                 else:
                     self.mp.mp[i][j].type = 'unknown'
 
-                if game_map[2][i][j] == self.bot_color:
+                if game_map[2][i - 1][j - 1] == self.bot_color:
                     self.mp.mp[i][j].belong = 1
                 else:
                     self.mp.mp[i][j].belong = 0
 
-                self.mp.mp[i][j].amount = int(game_map[0][i][j])
+                self.mp.mp[i][j].amount = int(game_map[0][i - 1][j - 1])
 
                 if self.mp.mp[i][j].belong != 1:
                     self.mp.mp[i][j].cost = max(self.mp.mp[i][j].amount, 2)
@@ -77,7 +77,6 @@ class Game(object):
     def pre(self):  # 预处理地图
         tmp = self.mp.find_match(lambda a: a.type == 'general' and a.belong == 1)
         if len(tmp) != 1:
-            print("")
             return 1
         self.home_x = tmp[0][0]
         self.home_y = tmp[0][1]
@@ -331,6 +330,7 @@ class Game(object):
         is_half = 0
         if 'Z' in self.movements:
             is_half = 1
+            self.movements.remove('Z')
         tmp = self.mp.mp[self.home_x][self.home_y].amount
         cur_movement = self.movements[0]
         while isinstance(cur_movement, list) or isinstance(cur_movement, tuple):
@@ -339,9 +339,8 @@ class Game(object):
             if not self.movements:
                 return
             cur_movement = self.movements[0]
-        act = [self.cur_x, self.cur_y, self.cur_x + directions[cur_movement][0],
-               self.cur_y + directions[cur_movement][1], is_half]
-        self.send_action(self.bot_color, act)
+        x_old = self.cur_x
+        y_old = self.cur_y
         if self.movements[0] == 'W':
             self.cur_x -= 1
         elif self.movements[0] == 'S':
@@ -350,6 +349,8 @@ class Game(object):
             self.cur_y -= 1
         elif self.movements[0] == 'D':
             self.cur_y += 1
+        act = [x_old, y_old, self.cur_x, self.cur_y, is_half]
+        self.send_action(self.bot_color, act)
         self.movements.pop(0)
         self.get_map_from_env()
         self.update_map()
@@ -362,7 +363,6 @@ class Game(object):
             if self.pre() == 1:
                 return
         if len(self.movements):
-            print("flushed")
             self.flush_movements()
             return
         if [self.cur_x, self.cur_y] not in self.vis:

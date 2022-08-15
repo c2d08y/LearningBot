@@ -74,7 +74,7 @@ class ActionTranslator(object):
         self.__indexes = {20: self.__20index, 19: self.__19index, 10: self.__10index, 9: self.__9index}
 
     def _generate(self, size):
-        action = [torch.Tensor([[0, 0, 0, 0, 0]])]
+        action = [torch.Tensor([[-1, -1, -1, -1, -1]])]
         index = []
         for _ in range(size + 1):
             index.append([])
