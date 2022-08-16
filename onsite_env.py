@@ -71,7 +71,7 @@ class OnSiteEnv(gym.Env):
     def step(self, action: torch.Tensor):
         """
         执行一步
-        :param action: movement => tensor([[x1, y1, x2, y2, is_half]])
+        :param action: movement => tensor([[x1, y1, x2, y2, is_half]]) 注意x,y和i,j正好相反
         :return: observation (Tensor), reward (float), done (bool), info (dict)
         """
         reward = 0
@@ -101,16 +101,19 @@ class OnSiteEnv(gym.Env):
         last_move = self.action_history.queue[-1]
         last_map = self.map_history.queue[-1]
         # 无效移动扣大分
-        if last_map[2][last_move[0] - 1][last_move[1] - 1] != self._get_colormark(self.self_color):
+        if last_map[2][last_move[1] - 1][last_move[0] - 1] != self._get_colormark(self.self_color):
             reward -= 100
+        # 撞山扣一点
+        if self.map[1][last_move[3] - 1][last_move[2] - 1] == BlockType.mountain:
+            reward -= 10
         # 撞塔扣分
-        if self.map[1][last_move[2] - 1][last_move[3] - 1] == BlockType.city:
-            if self.map[2][last_move[2] - 1][last_move[3] - 1] != self._get_colormark(self.self_color):
+        if self.map[1][last_move[3] - 1][last_move[2] - 1] == BlockType.city:
+            if self.map[2][last_move[3] - 1][last_move[2] - 1] != self._get_colormark(self.self_color):
                 reward -= 10
         # 探索新领地加分 注意 不是占领
         for i in range(8):
-            t_x = last_move[2] - 1 + _dirx[i]
-            t_y = last_move[3] - 1 + _diry[i]
+            t_x = last_move[3] - 1 + _dirx[i]
+            t_y = last_move[2] - 1 + _diry[i]
             if t_x < 0 or t_x >= self.map_size or t_y < 0 or t_y >= self.map_size:
                 continue
             if self.map[3][t_x][t_y] - last_map[3][t_x][t_y] == 1:
@@ -240,10 +243,14 @@ class OnSiteEnv(gym.Env):
     def move(self, mov):
         """
         just as the name
-        :param mov: tensor([[x1, y1, x2, y2, is_half]])
+        :param mov: tensor([[x1, y1, x2, y2, is_half]]) 注意x,y和i,j正好相反
         :return:
         """
         move_info = mov[0].long()
+        # 先交换 将x,y坐标转换为i,j坐标
+        move_info[0], move_info[1] = move_info[1], move_info[0]
+        move_info[2], move_info[3] = move_info[3], move_info[2]
+
         if self.selected[0] != move_info[0] - 1 or self.selected[1] != move_info[1] - 1:
             # 如果没选中 先点一下
             self.driver.find_element_by_id(f"td-{int((move_info[0] - 1) * self.map_size + move_info[1])}").click()

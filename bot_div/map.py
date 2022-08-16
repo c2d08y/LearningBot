@@ -15,6 +15,16 @@ class Node:
         self.type = type  # land city general unknown mountain empty empty-city
         self.cost = 0
 
+    def __str__(self):
+        return '{' +\
+               f"""
+                'amount': {self.amount},
+                'belong': {self.belong},
+                'type': {self.type},
+                'cost': {self.cost}
+                """\
+                + '}'
+
 
 def dist_node(a, b):
     return dist(a[0], a[1], b[0], b[1])

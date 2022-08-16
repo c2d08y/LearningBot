@@ -72,7 +72,7 @@ class OffSiteEnv(gym.Env):
     def step(self, action: torch.Tensor):
         """
         执行一步
-        :param action: movement => tensor([[x1, y1, x2, y2, is_half]])
+        :param action: movement => tensor([[x1, y1, x2, y2, is_half]]) 注意x,y和i,j正好相反
         :return: observation (Tensor), reward (float), done (bool), info (dict)
         """
         # 运行
@@ -106,16 +106,19 @@ class OffSiteEnv(gym.Env):
         if last_move[0] < 0:
             return obs, reward, False, {}
         # 无效移动扣大分
-        if last_obs[2][last_move[0] - 1][last_move[1] - 1] != self._get_colormark(self.learningbot_color):
+        if last_obs[2][last_move[1] - 1][last_move[0] - 1] != self._get_colormark(self.learningbot_color):
             reward -= 100
+        # 撞山扣一点
+        if last_obs[1][last_move[3] - 1][last_move[2] - 1] == BlockType.mountain:
+            reward -= 10
         # 撞塔扣分
-        if self.map[1][last_move[2] - 1][last_move[3] - 1] == BlockType.city:
-            if self.map[2][last_move[2] - 1][last_move[3] - 1] != self.learningbot_color:
+        if self.map[1][last_move[3] - 1][last_move[2] - 1] == BlockType.city:
+            if self.map[2][last_move[3] - 1][last_move[2] - 1] != self.learningbot_color:
                 reward -= 10
         # 探索新领地加分 注意 不是占领
         for i in range(8):
-            t_x = last_move[2] - 1 + _dirx[i]
-            t_y = last_move[3] - 1 + _diry[i]
+            t_x = last_move[3] - 1 + _dirx[i]
+            t_y = last_move[2] - 1 + _diry[i]
             if t_x < 0 or t_x >= self.map_size or t_y < 0 or t_y >= self.map_size:
                 continue
             if self.map[3][t_x][t_y] - last_obs[3][t_x][t_y] == 1:
@@ -150,13 +153,17 @@ class OffSiteEnv(gym.Env):
     def execute_actions(self, action: torch.Tensor):
         """
         执行动作
-        :param action: LearningBot的动作 内置bot动作会存到类变量里边 不需要传参
+        :param action: LearningBot的动作 内置bot动作会存到类变量里边 不需要传参 注意x,y和i,j正好相反
         :return:
         """
         # 处理内置bot动作
         for i in range(self.internal_bots_num):
             cur_color = self.internal_bots_color[i]
-            self.internal_bots[cur_color].bot_move()
+            try:
+                # 有的时候会有莫名其妙的报错 懒得调了 反正这个Bot很弱 也不差这一个回合 主要训练还是得靠和人打
+                self.internal_bots[cur_color].bot_move()
+            except Exception:
+                continue
             if not self.actions_now[cur_color]:
                 print(f"bot {cur_color} empty move")
                 continue
@@ -173,26 +180,26 @@ class OffSiteEnv(gym.Env):
 
             print(f"internal bot color {cur_color}: {cur_action}")
             # 检查动作是否合法
-            if cur_action[0] >= 0 and self.map[2][cur_action[0]][cur_action[1]] == cur_color:
-                f_amount = int(self.map[0][cur_action[0]][cur_action[1]])
+            if self.map[2][cur_action[1]][cur_action[0]] == cur_color:
+                f_amount = int(self.map[0][cur_action[1]][cur_action[0]])
                 if cur_action[4] == 1:
                     mov_troop = math.ceil((f_amount + 0.5) / 2) - 1
                 else:
                     mov_troop = f_amount - 1
-                self.combine((cur_action[0], cur_action[1]), (cur_action[2], cur_action[3]), mov_troop)
+                self.combine((cur_action[1], cur_action[0]), (cur_action[3], cur_action[2]), mov_troop)
 
         # 处理LearningBot动作
         act = self.at.i_to_a(self.map_size, int(action))[0].long()
         act -= 1
         act[4] += 1
-        # 检查动作是否合法
-        if act[0] >= 0 and self.map[2][act[0]][act[1]] == self.learningbot_color:
-            f_amount = int(self.map[0][act[0]][act[1]])
+        # 检查动作是否合法 act中可能会存在-1 代表空回合
+        if act[0] >= 0 and self.map[2][act[1]][act[0]] == self.learningbot_color:
+            f_amount = int(self.map[0][act[1]][act[0]])
             if act[4] == 1:
                 mov_troop = math.ceil((f_amount + 0.5) / 2) - 1
             else:
                 mov_troop = f_amount - 1
-            self.combine((act[0], act[1]), (act[2], act[3]), mov_troop)
+            self.combine((act[1], act[0]), (act[3], act[2]), mov_troop)
 
     def combine(self, b1: tuple, b2: tuple, cnt):
         """
@@ -228,10 +235,9 @@ class OffSiteEnv(gym.Env):
                     tcolor = t["color"]
                     for i in range(self.map_size):
                         for j in range(self.map_size):
-                            if self.map[2][i][j] == tcolor:
+                            if int(self.map[2][i][j]) == tcolor:
                                 self.map[2][i][j] = f["color"]
-                                if self.map[2][i][j] == BlockType.crown:
-                                    self.map[2][i][j] = BlockType.city
+                    t["type"] = BlockType.city
                 t["color"] = f["color"]
                 t["amount"] = -t["amount"]
 
@@ -284,7 +290,7 @@ class OffSiteEnv(gym.Env):
                     # 如果这个玩家现在看不到这一格
                     if color != self.learningbot_color or int(self.shown[color][i][j]) == 0:
                         # 如果是LearningBot 那就帮它保留视野吧(●'◡'●)
-                        if self.map[1][i][j] == BlockType.city:
+                        if self.map[1][i][j] == BlockType.city or self.map[1][i][j] == BlockType.mountain:
                             map_filtered[1][i][j] = BlockType.obstacle
                 else:
                     map_filtered[0][i][j] = self.map[0][i][j]
@@ -341,6 +347,8 @@ class OffSiteEnv(gym.Env):
         alive = []
         for i in range(self.map_size):
             for j in range(self.map_size):
+                if int(self.map[2][i][j]) == PlayerColor.grey:
+                    continue
                 if int(self.map[2][i][j]) not in alive:
                     alive.append(int(self.map[2][i][j]))
                 if len(alive) > 1:

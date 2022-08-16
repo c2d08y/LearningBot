@@ -45,20 +45,25 @@ class PPOAgent(object):
         :return:
         """
         s, a, a_log_prob, r, s_, done = rep.get_data()
+        # 全部送进N卡
+        s = s.to(self.device)
+        a = a.to(self.device)
+        a_log_prob = a_log_prob.to(self.device)
+        r = r.to(self.device)
+        s_ = s_.to(self.device)
+        done = done.to(self.device)
 
         # 利用GAE计算优势函数
         adv = []
         gae = 0
-        s = s.to(self.device)
-        s_ = s_.to(self.device)
         with torch.no_grad():  # 不需要梯度
             vs = self.v(s)
             vs_ = self.v(s_)
             deltas = r + self.gamma * (1.0 - done) * vs_ - vs
-            for delta, d in zip(reversed(deltas.flatten().numpy()), reversed(done.flatten().numpy())):
+            for delta, d in zip(reversed(deltas.flatten()), reversed(done.flatten())):
                 gae = delta + self.gamma * self.lamda * gae * (1.0 - d)
                 adv.insert(0, gae)
-            adv = torch.tensor(adv, dtype=torch.float).view(-1, 1)
+            adv = torch.tensor(adv, dtype=torch.float).view(-1, 1).to(self.device)
             v_target = adv + vs
 
         # 优势归一化

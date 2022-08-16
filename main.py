@@ -1,3 +1,4 @@
+import threading
 from torch.utils.tensorboard import SummaryWriter
 from agent import PPOAgent
 from onsite_env import OnSiteEnv
@@ -13,7 +14,7 @@ def main(offline_train=True):
 
     device = torch.device("cuda")
     args = {
-        "batch_size": 100,
+        "batch_size": 50,
         "state_dim": None,
         "action_dim": 5,
         "lr_a": 0.01,
@@ -29,6 +30,12 @@ def main(offline_train=True):
 
     agent = PPOAgent(args)
     agent.warm_up()
+
+    def update_model():
+        agent.learn(replay_buffer, total_steps)
+
+    def save_model():
+        agent.save()
 
     # 绘图器
     writer = SummaryWriter("offline_train_logs" if offline_train else "online_train_logs")
@@ -64,12 +71,14 @@ def main(offline_train=True):
 
             # 缓存到达batch size的时候更新参数
             if len(replay_buffer) == args["batch_size"]:
-                agent.learn(replay_buffer, total_steps)
+                _t = threading.Thread(target=update_model)
+                _t.start()
                 replay_buffer.clear()
 
             # 自动保存模型 batch_size和autosave step的最小公倍数尽量大 因为同时保存和更新比较耗时间
             if total_steps % args["autosave_step"] == 0:
-                agent.save()
+                _t = threading.Thread(target=save_model)
+                _t.start()
 
         if env.quit_signal():
             break
@@ -77,3 +86,15 @@ def main(offline_train=True):
 
 if __name__ == '__main__':
     main()
+
+
+"""
+Traceback (most recent call last):
+  File "D:/MyFiles/LearningBot/main.py", line 88, in <module>
+    main()
+  File "D:/MyFiles/LearningBot/main.py", line 83, in main
+    if env.quit_signal():
+AttributeError: 'OffSiteEnv' object has no attribute 'quit_signal'
+
+Process finished with exit code 1
+"""

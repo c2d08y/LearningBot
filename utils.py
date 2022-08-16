@@ -131,7 +131,8 @@ def print_tensor_map(game_map):
     size = game_map.shape[1]
     for i in range(size):
         for j in range(size):
-            if game_map[1][i][j] == BlockType.city or game_map[1][i][j] == BlockType.mountain:
+            if game_map[2][i][j] == PlayerColor.grey and \
+                    game_map[1][i][j] == BlockType.city or game_map[1][i][j] == BlockType.mountain:
                 bg = 40
             else:
                 bg = color_trans[int(game_map[2][i][j])]

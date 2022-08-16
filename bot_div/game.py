@@ -42,6 +42,7 @@ class Game(object):
         game_map = self.get_tensor_map(self.bot_color)
         map_size = game_map.shape[1]
         game_map = game_map.long().tolist()
+        self.mp.resize(map_size)
         for i in range(1, map_size + 1):
             for j in range(1, map_size + 1):
                 if game_map[1][i - 1][j - 1] == BlockType.city:
@@ -242,7 +243,7 @@ class Game(object):
             ans_top_right = (ans_top_left[0], ans_bottom_right[1])
             ans_bottom_left = (ans_bottom_right[0], ans_top_left[1])
             ans = [ans_top_left, ans_top_right, ans_bottom_left, ans_bottom_right]
-            print(ans, best_sum)
+            # print(ans, best_sum)
             tmp = []
             target_node = (x, y)
             for i in ans:
@@ -286,7 +287,7 @@ class Game(object):
             min_y = min(ans_top_left[1], ans_top_right[1])
             max_y = max(ans_top_left[1], ans_top_right[1])
             while cx != end_node[0] or cy != end_node[1]:  # 蛇形遍历
-                print(cx, cy)
+                # print(cx, cy)
                 px = cx
                 py = cy
                 if cur_dir:
@@ -349,7 +350,7 @@ class Game(object):
             self.cur_y -= 1
         elif self.movements[0] == 'D':
             self.cur_y += 1
-        act = [x_old, y_old, self.cur_x, self.cur_y, is_half]
+        act = [y_old, x_old, self.cur_y, self.cur_x, is_half]
         self.send_action(self.bot_color, act)
         self.movements.pop(0)
         self.get_map_from_env()
