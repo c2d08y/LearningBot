@@ -60,7 +60,7 @@ class OnSiteEnv(gym.Env):
         # 初始化地图
         c1, c2 = self.init_map()
         # 保存action
-        self.action_history.put(torch.as_tensor([0, 0, 0, 0, 0], dtype=torch.long))
+        self.action_history.put(torch.as_tensor([-1, -1, -1, -1, -1], dtype=torch.long))
 
         if c1 != 1 or c2 >= 100:
             # 如果是流浪或者抓虾 那没事了
@@ -100,6 +100,13 @@ class OnSiteEnv(gym.Env):
         _diry = [-1, 0, 1, 0, 1, -1, -1, 1]
         last_move = self.action_history.queue[-1]
         last_map = self.map_history.queue[-1]
+        # 保存action
+        if self.action_history.qsize() == 3:
+            self.action_history.get()
+        self.action_history.put(copy.copy(action[0].long()))
+        # 如果动作为空
+        if last_move[0] < 0:
+            return self.observation, reward, False, {}
         # 无效移动扣大分
         if last_map[2][last_move[1] - 1][last_move[0] - 1] != self._get_colormark(self.self_color):
             reward -= 100
@@ -121,11 +128,6 @@ class OnSiteEnv(gym.Env):
                 # 如果探到玩家 额外给0.5
                 if self.map[3][t_x][t_y] != self._get_colormark(PlayerColor.grey):
                     reward += 0.5
-
-        # 保存action
-        if self.action_history.qsize() == 3:
-            self.action_history.get()
-        self.action_history.put(copy.copy(action[0].long()))
 
         # 再检查一遍 有没有结束
         state_now = self.win_check()

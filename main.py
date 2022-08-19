@@ -5,6 +5,7 @@ from onsite_env import OnSiteEnv
 from offsite_env import OffSiteEnv
 from normalization import *
 from replay_buffer import *
+from const import *
 
 
 def main(offline_train=True):
@@ -12,7 +13,6 @@ def main(offline_train=True):
 
     total_steps = 0  # 记录总步数
 
-    device = torch.device("cuda")
     args = {
         "batch_size": 50,
         "state_dim": None,
@@ -25,7 +25,6 @@ def main(offline_train=True):
         "k_epochs": 10,
         "entropy_coef": 0.01,
         "autosave_step": 107,
-        "device": device
     }
 
     agent = PPOAgent(args)
@@ -56,9 +55,12 @@ def main(offline_train=True):
         reward_scaling.reset()
 
         done = False
+        total_reward = 0
+        _step = total_steps
         while not done:
             a, a_log_prob = agent.predict(s)
             s_, r, done, _ = env.step(a)
+            total_reward += r
 
             env.render("human")
 
@@ -71,14 +73,21 @@ def main(offline_train=True):
 
             # 缓存到达batch size的时候更新参数
             if len(replay_buffer) == args["batch_size"]:
-                _t = threading.Thread(target=update_model)
-                _t.start()
+                _t1 = threading.Thread(target=update_model)
+                _t1.start()
                 replay_buffer.clear()
 
             # 自动保存模型 batch_size和autosave step的最小公倍数尽量大 因为同时保存和更新比较耗时间
             if total_steps % args["autosave_step"] == 0:
-                _t = threading.Thread(target=save_model)
-                _t.start()
+                _t2 = threading.Thread(target=save_model)
+                _t2.start()
+
+        # 绘制reward曲线 代表学习效果
+        if env.episode % 10 == 0:
+            writer.add_scalar(f"offline_train_{env.mode}", total_reward, env.episode)
+
+        game_result = "won" if env.win_check() == 2 else "lost"
+        print(f"game {env.episode}: bot " + game_result + f", total_reward={total_reward}, step={total_steps - _step}")
 
         if env.quit_signal():
             break
@@ -89,12 +98,5 @@ if __name__ == '__main__':
 
 
 """
-Traceback (most recent call last):
-  File "D:/MyFiles/LearningBot/main.py", line 88, in <module>
-    main()
-  File "D:/MyFiles/LearningBot/main.py", line 83, in main
-    if env.quit_signal():
-AttributeError: 'OffSiteEnv' object has no attribute 'quit_signal'
-
-Process finished with exit code 1
+检查mask是否生效 现在似乎没有起作用
 """

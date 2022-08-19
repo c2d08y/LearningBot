@@ -6,3 +6,4 @@ __pycache__/
 .idea/
 offline_train_logs/
 online_train_logs/
+python.exe.lnk

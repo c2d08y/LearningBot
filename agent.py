@@ -14,20 +14,19 @@ class PPOAgent(object):
         self.epsilon = args["epsilon"]                  # PPO ε
         self.k_epochs = args["k_epochs"]                # PPO 训练轮数
         self.entropy_coef = args["entropy_coef"]
-        self.device = args["device"]                    # 运行设备
 
         # 神经网络
         self.pai_set = {
-            20: get_model("actor", "./model/non_maze.pth", 20).to(self.device),
-            19: get_model("actor", "./model/maze.pth", 19).to(self.device),
-            10: get_model("actor", "./model/non_maze1v1.pth", 10).to(self.device),
-            9: get_model("actor", "./model/maze1v1.pth", 9).to(self.device)
+            20: get_model("actor", "./model/non_maze.pth", 20).to(device),
+            19: get_model("actor", "./model/maze.pth", 19).to(device),
+            10: get_model("actor", "./model/non_maze1v1.pth", 10).to(device),
+            9: get_model("actor", "./model/maze1v1.pth", 9).to(device)
         }
         self.v_set = {
-            20: get_model("critic", "./model/non_maze_critic.pth", 20).to(self.device),
-            19: get_model("critic", "./model/maze_critic.pth", 19).to(self.device),
-            10: get_model("critic", "./model/non_maze1v1_critic.pth", 10).to(self.device),
-            9: get_model("critic", "./model/maze1v1_critic.pth", 9).to(self.device)
+            20: get_model("critic", "./model/non_maze_critic.pth", 20).to(device),
+            19: get_model("critic", "./model/maze_critic.pth", 19).to(device),
+            10: get_model("critic", "./model/non_maze1v1_critic.pth", 10).to(device),
+            9: get_model("critic", "./model/maze1v1_critic.pth", 9).to(device)
         }
         self.pai = self.pai_set[20]
         self.v = self.v_set[20]
@@ -46,12 +45,12 @@ class PPOAgent(object):
         """
         s, a, a_log_prob, r, s_, done = rep.get_data()
         # 全部送进N卡
-        s = s.to(self.device)
-        a = a.to(self.device)
-        a_log_prob = a_log_prob.to(self.device)
-        r = r.to(self.device)
-        s_ = s_.to(self.device)
-        done = done.to(self.device)
+        s = s.to(device)
+        a = a.to(device)
+        a_log_prob = a_log_prob.to(device)
+        r = r.to(device)
+        s_ = s_.to(device)
+        done = done.to(device)
 
         # 利用GAE计算优势函数
         adv = []
@@ -63,7 +62,7 @@ class PPOAgent(object):
             for delta, d in zip(reversed(deltas.flatten()), reversed(done.flatten())):
                 gae = delta + self.gamma * self.lamda * gae * (1.0 - d)
                 adv.insert(0, gae)
-            adv = torch.tensor(adv, dtype=torch.float).view(-1, 1).to(self.device)
+            adv = torch.tensor(adv, dtype=torch.float).view(-1, 1).to(device)
             v_target = adv + vs
 
         # 优势归一化
@@ -143,7 +142,7 @@ class PPOAgent(object):
         预热 因为神经网络第一次跑会比较慢
         :return:
         """
-        t = torch.zeros([1, 12, 20, 20]).to(self.device)
+        t = torch.zeros([1, 12, 20, 20]).to(device)
         self.pai(t)
         self.v(t)
 

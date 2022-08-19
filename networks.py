@@ -1,4 +1,5 @@
 from torch import nn
+from const import *
 
 
 def orthogonal_init(layer, gain=1.0):
@@ -28,23 +29,26 @@ class Actor(nn.Module):
 
         # 全连接层和softmax
         self.dense_in = 48 * size ** 2
-        self.dense_out = 4 * ((size - 2) ** 2 + 3 * (size - 2) + 2) * 2
+        self.dense_out = 4 * ((size - 2) ** 2 + 3 * (size - 2) + 2) * 2 + 1
         self.dense1 = nn.Linear(in_features=self.dense_in, out_features=self.dense_out)
         self.dense2 = nn.Linear(in_features=self.dense_out, out_features=self.dense_out)
-        self.softmax = nn.Softmax(dim=0)
+        self.softmax = nn.Softmax(dim=1)
 
         # 激活函数
         self.activ_func = nn.Tanh()
 
         # 正交初始化
-        orthogonal_init(self.conv1)
-        orthogonal_init(self.conv2)
-        orthogonal_init(self.conv3)
-        orthogonal_init(self.conv4)
-        orthogonal_init(self.dense1)
-        orthogonal_init(self.dense2, gain=0.01)
+        # orthogonal_init(self.conv1)
+        # orthogonal_init(self.conv2)
+        # orthogonal_init(self.conv3)
+        # orthogonal_init(self.conv4)
+        # orthogonal_init(self.dense1)
+        # orthogonal_init(self.dense2, gain=0.01)
 
     def forward(self, x):
+        # 先生成MASK表
+        mask = at.mask(x, x.shape[2])
+
         x = self.conv1(x)
         x = self.batch_norm1(x)
         x = self.activ_func(x)
@@ -67,6 +71,9 @@ class Actor(nn.Module):
         x = self.activ_func(x)
 
         x = self.dense2(x)
+
+        # softmax之前mask一下
+        x *= mask
         x = self.softmax(x)
         return x
 
@@ -87,7 +94,7 @@ class Critic(nn.Module):
 
         # 全连接层
         self.dense_in = 48 * size ** 2
-        self.dense_out = 4 * ((size - 2) ** 2 + 3 * (size - 2) + 2) * 2
+        self.dense_out = 4 * ((size - 2) ** 2 + 3 * (size - 2) + 2) * 2 + 1
         self.dense1 = nn.Linear(in_features=self.dense_in, out_features=self.dense_out)
         self.dense2 = nn.Linear(in_features=self.dense_out, out_features=1)
 
@@ -95,12 +102,12 @@ class Critic(nn.Module):
         self.activ_func = nn.Tanh()
 
         # 正交初始化
-        orthogonal_init(self.conv1)
-        orthogonal_init(self.conv2)
-        orthogonal_init(self.conv3)
-        orthogonal_init(self.conv4)
-        orthogonal_init(self.dense1)
-        orthogonal_init(self.dense2, gain=0.01)
+        # orthogonal_init(self.conv1)
+        # orthogonal_init(self.conv2)
+        # orthogonal_init(self.conv3)
+        # orthogonal_init(self.conv4)
+        # orthogonal_init(self.dense1)
+        # orthogonal_init(self.dense2, gain=0.01)
 
     def forward(self, x):
         x = self.conv1(x)

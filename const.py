@@ -5,7 +5,7 @@ class BlockType(object):
     road = 0                # null, unshown null
     obstacle = 1            # obstacle
     mountain = 2            # mountain
-    crown = 3               # crown
+    crown = 300             # crown
     city = 4                # empty-city, city
 
 
@@ -61,6 +61,7 @@ class Style(object):
 
 dx = [0, -1, 0, 1]
 dy = [-1, 0, 1, 0]
+inf = 999999999
 
 
 class ActionTranslator(object):
@@ -109,3 +110,21 @@ class ActionTranslator(object):
                 direction = i
         return self.__indexes[size][action[0][0]][action[0][1]][direction][action[0][4]]
 
+    def mask(self, obs, map_size):
+        o = obs[0]
+        mask_vec = torch.zeros([len(self.__actions[map_size])], dtype=torch.long)
+        for _a in range(len(self.__actions[map_size])):
+            act = self.__actions[map_size][_a][0]
+            act -= 1
+            act[4] += 1
+
+            if int(o[2][int(act[1]) - 1][int(act[0]) - 1]) != 0:
+                # 不是自己的
+                mask_vec[_a] = -inf
+            else:
+                mask_vec[_a] = 1
+        return mask_vec.to(device)
+
+
+at = ActionTranslator()
+device = torch.device("cuda")
