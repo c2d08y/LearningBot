@@ -1,6 +1,5 @@
-import torch
 from torch import nn
-from torch.nn import functional as F
+from const import *
 
 
 def orthogonal_init(layer, gain=1.0):
@@ -72,7 +71,8 @@ class Actor(nn.Module):
         return self.my_PReLU(x)
 
     def my_PReLU(self, x):
-        return torch.max(x, torch.FloatTensor([0.0]).cuda()) - 0.05 * torch.min(x, torch.FloatTensor([0.0]).cuda())
+        return torch.max(x, torch.FloatTensor([0.0]).to(device)) - \
+               0.05 * torch.min(x, torch.FloatTensor([0.0]).to(device))
 
 
 class Critic(nn.Module):
