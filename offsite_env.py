@@ -33,10 +33,6 @@ class OffSiteEnv(gym.Env):
         self.internal_bots = {}
         self.internal_bots_num = 0
         self.internal_bots_color = []
-        for i in range(1, 9):
-            if i != self.learningbot_color:
-                self.internal_bots_color.append(i)
-                self.internal_bots[i] = ibot.Game(i, self.get_view_of, self.bot_action_upd)
         self.actions_now = [[], [], [], [], [], [], [], []]
 
     def reset(self):
@@ -56,19 +52,26 @@ class OffSiteEnv(gym.Env):
                 self.player_num = random.randint(3, 8)
         self.episode += 1
         self.gen_map(self.player_num)
+        self.round = 0
 
         # 初始化shown
         self.shown = torch.zeros([9, self.map_size, self.map_size])
 
         # 初始化内部bot
         self.internal_bots_num = self.player_num - 1
+        for i in range(1, 9):
+            if i != self.learningbot_color:
+                self.internal_bots_color.append(i)
+                self.internal_bots[i] = ibot.Game(i, self.get_view_of, self.bot_action_upd)
 
         # 处理observation
+        self.obs_history.queue.clear()
         self.obs_history.put(torch.zeros([4, self.map_size, self.map_size]))
         self.obs_history.put(torch.zeros([4, self.map_size, self.map_size]))
         self.obs_history.put(copy.copy(self.get_view_of(self.learningbot_color)))
 
         # 先推一个空action进去 而且action_history还是只存list为妙 不然会有莫名其妙的错误
+        self.action_history.queue.clear()
         self.action_history.put([-1, -1, -1, -1, -1])
         return self.gen_observation()
 
@@ -111,12 +114,9 @@ class OffSiteEnv(gym.Env):
         # 如果动作为空
         if last_move[0] < 0 or self.round == 1:
             return obs, reward, False, {}
-        # 无效移动扣大分
-        if int(last_obs[2][last_move[1] - 1][last_move[0] - 1]) != self._get_colormark(self.learningbot_color):
-            reward -= 100
         # 撞山扣一点
         if last_obs[1][last_move[3] - 1][last_move[2] - 1] == BlockType.mountain:
-            reward -= 2
+            reward -= 0.3
         # 撞塔扣分
         if self.map[1][last_move[3] - 1][last_move[2] - 1] == BlockType.city:
             if self.map[2][last_move[3] - 1][last_move[2] - 1] != self.learningbot_color:
@@ -190,19 +190,16 @@ class OffSiteEnv(gym.Env):
                 self.combine((cur_action[1], cur_action[0]), (cur_action[3], cur_action[2]), mov_troop)
 
         # 处理LearningBot动作
-        act = at.i_to_a(self.map_size, int(action))[0].long()
-        act -= 1
-        act[4] += 1
-        # is_available = "available" if self.map[2][act[1]][act[0]] == self.learningbot_color else "unavailable"
-        # print(f"<{is_available}>: {act.tolist()}")
+        act = at.i_to_a(self.map_size, int(action))[0].long().tolist()
+        print(act)
         # 检查动作是否合法 act中可能会存在-1 代表空回合
-        if act[0] >= 0 and self.map[2][act[1]][act[0]] == self.learningbot_color:
-            f_amount = int(self.map[0][act[1]][act[0]])
+        if act[0] - 1 >= 0 and self.map[2][act[1] - 1][act[0] - 1] == self.learningbot_color:
+            f_amount = int(self.map[0][act[1] - 1][act[0] - 1])
             if act[4] == 1:
                 mov_troop = math.ceil((f_amount + 0.5) / 2) - 1
             else:
                 mov_troop = f_amount - 1
-            self.combine((act[1], act[0]), (act[3], act[2]), mov_troop)
+            self.combine((act[1] - 1, act[0] - 1), (act[3] - 1, act[2] - 1), mov_troop)
 
     def combine(self, b1: tuple, b2: tuple, cnt):
         """

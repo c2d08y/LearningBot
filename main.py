@@ -46,25 +46,28 @@ def main(offline_train=True):
         agent.change_network(env.map_size)
 
         # 初始化一些用于归一化的类
-        state_norm = Normalization(shape=args["state_dim"])  # Trick 2:state normalization
+        # state_norm = Normalization(shape=args["state_dim"])  # Trick 2:state normalization
         reward_scaling = RewardScaling(shape=1, gamma=args["gamma"])
 
         replay_buffer = ReplayBuffer(args)
 
-        s = state_norm(s).to(device)
+        # s = state_norm(s).to(device)
+        s = s.to(device)
         reward_scaling.reset()
 
         done = False
         total_reward = 0
         _step = total_steps
+        render_mode = "machine"
         while not done:
             a, a_log_prob = agent.predict(s)
             s_, r, done, _ = env.step(a)
             total_reward += r
 
-            env.render("human")
+            env.render(render_mode)
 
-            s_ = state_norm(s_).to(device)
+            # s_ = state_norm(s_).to(device)
+            s_ = s_.to(device)
             r = reward_scaling(r)
 
             replay_buffer.store(s, a, a_log_prob, r, s_, done)
@@ -82,6 +85,10 @@ def main(offline_train=True):
                 _t2 = threading.Thread(target=save_model)
                 _t2.start()
 
+            # 手动特判
+            if r > 0:
+                render_mode = "human"
+
         # 绘制reward曲线 代表学习效果
         if env.episode % 10 == 0:
             writer.add_scalar(f"offline_train_{env.mode}", total_reward, env.episode)
@@ -95,8 +102,3 @@ def main(offline_train=True):
 
 if __name__ == '__main__':
     main()
-
-
-"""
-检查mask是否生效 现在似乎没有起作用
-"""

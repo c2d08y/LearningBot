@@ -1,5 +1,6 @@
+import torch
 from torch import nn
-from const import *
+from torch.nn import functional as F
 
 
 def orthogonal_init(layer, gain=1.0):
@@ -46,9 +47,6 @@ class Actor(nn.Module):
         # orthogonal_init(self.dense2, gain=0.01)
 
     def forward(self, x):
-        # 先生成MASK表
-        mask = at.mask(x, x.shape[2])
-
         x = self.conv1(x)
         x = self.batch_norm1(x)
         x = self.activ_func(x)
@@ -71,11 +69,10 @@ class Actor(nn.Module):
         x = self.activ_func(x)
 
         x = self.dense2(x)
+        return self.my_PReLU(x)
 
-        # softmax之前mask一下
-        x *= mask
-        x = self.softmax(x)
-        return x
+    def my_PReLU(self, x):
+        return torch.max(x, torch.FloatTensor([0.0]).cuda()) - 0.05 * torch.min(x, torch.FloatTensor([0.0]).cuda())
 
 
 class Critic(nn.Module):

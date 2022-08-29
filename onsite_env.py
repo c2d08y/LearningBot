@@ -98,18 +98,15 @@ class OnSiteEnv(gym.Env):
         # 计算上一步的奖励
         _dirx = [0, -1, 0, 1, 1, -1, 1, -1]
         _diry = [-1, 0, 1, 0, 1, -1, -1, 1]
-        last_move = self.action_history.queue[-1]
+        last_move = self.action_history.queue[-1].long().tolist()
         last_map = self.map_history.queue[-1]
         # 保存action
         if self.action_history.qsize() == 3:
             self.action_history.get()
-        self.action_history.put(copy.copy(action[0].long()))
+        self.action_history.put(copy.copy(at.i_to_a(self.map_size, int(action[0].long()))[0]))
         # 如果动作为空
         if last_move[0] < 0:
             return self.observation, reward, False, {}
-        # 无效移动扣大分
-        if last_map[2][last_move[1] - 1][last_move[0] - 1] != self._get_colormark(self.self_color):
-            reward -= 100
         # 撞山扣一点
         if self.map[1][last_move[3] - 1][last_move[2] - 1] == BlockType.mountain:
             reward -= 10
@@ -276,6 +273,7 @@ class OnSiteEnv(gym.Env):
         """
         try:
             t = self.driver.find_element(By.ID, "swal2-content")
+            self.driver.find_element(By.CSS_SELECTOR, "div.swal2-actions > button.swal2-confirm.swal2-styled")
             if t.text.strip() == settings.bot_name + "赢了":
                 return 2
         except NoSuchElementException:

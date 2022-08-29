@@ -61,7 +61,7 @@ class Style(object):
 
 dx = [0, -1, 0, 1]
 dy = [-1, 0, 1, 0]
-inf = 999999999
+inf = 999999999.0
 
 
 class ActionTranslator(object):
@@ -95,6 +95,13 @@ class ActionTranslator(object):
                         continue
                     index[i][j][k][0] = len(action)
                     action.append(torch.Tensor([[i, j, tgx, tgy, 0]]))
+        for i in range(1, size + 1):
+            for j in range(1, size + 1):
+                for k in range(4):
+                    tgx = i + dx[k]
+                    tgy = j + dy[k]
+                    if tgx < 1 or tgx > size or tgy < 1 or tgy > size:
+                        continue
                     index[i][j][k][1] = len(action)
                     action.append(torch.Tensor([[i, j, tgx, tgy, 1]]))
 
@@ -113,18 +120,26 @@ class ActionTranslator(object):
     def mask(self, obs, map_size):
         o = obs[0]
         mask_vec = torch.zeros([len(self.__actions[map_size])], dtype=torch.long)
-        for _a in range(len(self.__actions[map_size])):
-            act = self.__actions[map_size][_a][0]
-            act -= 1
-            act[4] += 1
-
-            if int(o[2][int(act[1]) - 1][int(act[0]) - 1]) != 0:
+        mask_vec[0] = 1.0
+        for _a in range(1, len(self.__actions[map_size])):
+            act = self.__actions[map_size][_a][0].long().tolist()
+            if int(o[10][act[1] - 1][act[0] - 1]) != 0:
                 # 不是自己的
                 mask_vec[_a] = -inf
             else:
-                mask_vec[_a] = 1
+                mask_vec[_a] = 1.0
         return mask_vec.to(device)
 
 
 at = ActionTranslator()
-device = torch.device("cuda")
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+else:
+    device = torch.device("cpu")
+
+
+def debug_output_mask(_mask):
+    print("[", end='')
+    for _ in _mask:
+        print(f"{_},", end=' ')
+    print("]")

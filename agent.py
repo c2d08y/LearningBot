@@ -1,3 +1,4 @@
+from torch.nn import functional as F
 from torch.distributions import Categorical
 from torch.utils.data import BatchSampler, SubsetRandomSampler
 from utils import *
@@ -71,7 +72,8 @@ class PPOAgent(object):
         # 参数更新k轮
         for _ in range(self.k_epochs):
             for index in BatchSampler(SubsetRandomSampler(range(self.batch_size)), self.batch_size, False):
-                dist_now = Categorical(self.pai(s[index]))
+                mask = at.mask(s[index], s[index].shape[2])
+                dist_now = Categorical(mask * self.pai.softmax(self.pai(s[index])))
                 dist_entropy = dist_now.entropy().view(-1, 1)                       # shape(batch_size x 1)
                 a_log_prob_now = dist_now.log_prob(a[index].squeeze()).view(-1, 1)  # shape(batch_size x 1)
 
@@ -123,7 +125,9 @@ class PPOAgent(object):
         :return: 2 tensors: action, ln(p(a_t|s_t))
         """
         with torch.no_grad():
-            action_p = Categorical(self.pai(observation))
+            mask = at.mask(observation, observation.shape[2])
+            act_ = self.pai(observation) * mask
+            action_p = Categorical(self.pai.softmax(act_))
             action = action_p.sample()
             a_log_prob = action_p.log_prob(action)
         return action, a_log_prob
